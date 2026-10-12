@@ -545,6 +545,9 @@ test("CAMERA ON uses real asynchronous PosePipeline with synthetic upper/full Po
     };
   });
   assert.equal(upper.source, "NORMALIZED");
+  await page.waitForFunction(() =>
+    document.querySelector("#labDebug").textContent.includes("POSE DETECTED"),
+  );
   assert.equal(upper.legs, false);
   assert.equal(upper.skeleton, 33);
   assert.ok(upper.poseAge < 500);

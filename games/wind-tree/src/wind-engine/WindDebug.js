@@ -96,7 +96,8 @@ export class WindDebug {
     const position = (h) => (h.position ? f(h.position) : "—");
     const local = (h) =>
       h.position ? f(h.at(...h.position, engine.config)) : "0, 0, 0";
-    return `${engine.count} particles | +X EAST / +Y UP / -Z NORTH\nPOSE ${engine.body.age <= 0.25 ? "DETECTED" : "LOST"} | LANDMARKS ${metrics.landmarkCount || 0}/33\nINFERENCE FPS ${(metrics.poseFps || 0).toFixed(1)} | RENDER FPS ${(metrics.renderFps || 0).toFixed(1)}\nBODY AXIS XYZ (${f(engine.body.raw || [0, 0, 0])})\nWEATHER (${f(components.weather)})\nBODY (${f(components.body)}) ${engine.body.age <= 0.25 ? "DETECTED" : "LOST"}\nLEFT position (${position(engine.left)}) | velocity (${f(components.left)})\nLEFT field at hand (${local(engine.left)}) ${engine.left.age <= 0.25 ? "DETECTED" : "LOST"}\nRIGHT position (${position(engine.right)}) | velocity (${f(components.right)})\nRIGHT field at hand (${local(engine.right)}) ${engine.right.age <= 0.25 ? "DETECTED" : "LOST"}\nMAX SPEED ${engine.maxSpeed} units/s | WRAP`;
+    const poseDetected = metrics.poseDetected ?? engine.body.age <= 0.25;
+    return `${engine.count} particles | +X EAST / +Y UP / -Z NORTH\nPOSE ${poseDetected ? "DETECTED" : "LOST"} | LANDMARKS ${metrics.landmarkCount || 0}/33\nINFERENCE FPS ${(metrics.poseFps || 0).toFixed(1)} | RENDER FPS ${(metrics.renderFps || 0).toFixed(1)}\nBODY AXIS XYZ (${f(engine.body.raw || [0, 0, 0])})\nWEATHER (${f(components.weather)})\nBODY (${f(components.body)}) ${engine.body.age <= 0.25 ? "DETECTED" : "LOST"}\nLEFT position (${position(engine.left)}) | velocity (${f(components.left)})\nLEFT field at hand (${local(engine.left)}) ${engine.left.age <= 0.25 ? "DETECTED" : "LOST"}\nRIGHT position (${position(engine.right)}) | velocity (${f(components.right)})\nRIGHT field at hand (${local(engine.right)}) ${engine.right.age <= 0.25 ? "DETECTED" : "LOST"}\nMAX SPEED ${engine.maxSpeed} units/s | WRAP`;
   }
   dispose() {
     for (const obj of [
