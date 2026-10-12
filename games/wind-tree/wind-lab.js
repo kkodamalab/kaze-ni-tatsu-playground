@@ -666,6 +666,8 @@ export class WindLab {
   }
   finishGraphics() {
     if (this.graphicsPaused) return;
+    // The RAF can finish before the 100ms play UI timer; commit results before release.
+    this.play?.sync(performance.now());
     // Keep the grown tree/results as a CPU canvas, then release the live capture and GPU.
     const image = document.createElement("canvas");
     image.width = this.renderer.domElement.width;
