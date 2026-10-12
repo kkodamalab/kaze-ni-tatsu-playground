@@ -90,7 +90,9 @@ export class CoordinateMapper {
     const worldUsable =
       comparable &&
       worldLandmarks?.length >= 33 &&
-      indices.every((i) => finiteWorld(worldLandmarks[i])) &&
+      [
+        ...new Set([...indices, ...[23, 24].filter((i) => visible(lm[i]))]),
+      ].every((i) => finiteWorld(worldLandmarks[i])) &&
       span(worldLandmarks) > 0.08 &&
       Math.sign(worldLandmarks[11].x - worldLandmarks[12].x) ===
         Math.sign(lm[11].x - lm[12].x);
@@ -165,7 +167,7 @@ export class CoordinateMapper {
       return null;
     });
     let bodyAxis = null;
-    if (trackingMode === "FULL BODY") {
+    if ([23, 24].every((i) => visible(lm[i]) && validLandmark(input[i]))) {
       const shoulder = ["x", "y", "z"].map(
         (k) => ((input[11][k] || 0) + (input[12][k] || 0)) / 2,
       );
