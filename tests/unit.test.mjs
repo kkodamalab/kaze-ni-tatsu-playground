@@ -292,3 +292,24 @@ test("finite but inconsistent World head proportions fall back as one complete n
     frame.points.filter(Boolean).every((p) => p.every(Number.isFinite)),
   );
 });
+
+test("upper-body Pose detection is independent of missing body-axis wind input", async () => {
+  const { trackingSnapshot } =
+    await import("../games/wind-tree/src/wind-lab/TrackingReport.js");
+  const data = upper(),
+    m = new CoordinateMapper(),
+    f = m.avatarPose(data.landmarks, null, 0);
+  const e = new WindEngine({ ...isolated, avatar: true }),
+    a = new SkeletonAvatar(new THREE.Scene());
+  e.input(m.fromPose(data.landmarks, null, f), 1);
+  a.input(f, 0);
+  a.update(0, 0.016, e.config, e);
+  const row = trackingSnapshot(e, {}, a);
+  assert.equal(row.pose_detected, true);
+  assert.equal(row.body_detected, false);
+  const d = new WindDebug(new THREE.Scene());
+  assert.match(d.text(e, { poseDetected: true }), /POSE DETECTED/);
+  d.dispose();
+  a.dispose();
+  e.dispose();
+});

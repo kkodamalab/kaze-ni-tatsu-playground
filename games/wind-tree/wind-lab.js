@@ -619,6 +619,7 @@ export class WindLab {
       this.debug.weatherArrow.visible = false;
     }
     this.avatar.update(t, dt, this.engine.config, this.engine);
+    this.diagnostics.poseDetected = this.avatar.state === "DETECTED";
     this.avatar.lineMaterial.color.setHex(WIND_COLORS.skeleton);
     this.avatar.jointMaterial.color.setHex(0xffffff);
     this.controls.update();

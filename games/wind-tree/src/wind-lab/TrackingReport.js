@@ -10,7 +10,10 @@ export function trackingSnapshot(
     neutral = tiltDegrees(engine.body.neutral),
     row = {
       timestamp: now,
-      pose_detected: !!engine.body.raw && engine.body.age <= 0.25,
+      pose_detected: avatar
+        ? avatar.state === "DETECTED"
+        : !!engine.body.raw && engine.body.age <= 0.25,
+      body_detected: !!engine.body.raw && engine.body.age <= 0.25,
       input_source: avatar?.source || "NONE",
       valid_landmarks: avatar?.validCount || 0,
       calibrated: engine.body.calibrated,
