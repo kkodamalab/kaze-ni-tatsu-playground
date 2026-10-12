@@ -1,3 +1,4 @@
+import { validLandmark } from "../wind-engine/CoordinateMapper.js";
 import { POSE_CONNECTIONS } from "./PoseConnections.js";
 export function drawPoseOverlay(canvas, landmarks, enabled, video) {
   canvas.width = 360;
@@ -18,11 +19,7 @@ export function drawPoseOverlay(canvas, landmarks, enabled, video) {
   for (const [a, b] of POSE_CONNECTIONS) {
     const p = landmarks[a],
       q = landmarks[b];
-    if (
-      !finite(p) ||
-      !finite(q) ||
-      Math.min(p.visibility ?? 1, q.visibility ?? 1) < 0.45
-    )
+    if (!finite(p) || !finite(q) || !validLandmark(p) || !validLandmark(q))
       continue;
     ctx.beginPath();
     ctx.moveTo(x(p), y(p));

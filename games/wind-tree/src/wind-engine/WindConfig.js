@@ -6,6 +6,10 @@ export const DEFAULTS = Object.freeze({
   gridZ: 10,
   dotSize: 3,
   speed: 100,
+  ambient: true,
+  ambientSpeed: 40,
+  drift: 25,
+  verticalFlow: "DOWN",
   particles: true,
   trail: true,
   trailDuration: 1,
@@ -26,6 +30,8 @@ export const DEFAULTS = Object.freeze({
   responsePreset: "NORMAL",
 });
 export const RANGES = Object.freeze({
+  ambientSpeed: [0, 100, 1],
+  drift: [0, 100, 1],
   handGain: [0, 500, 1],
   avatarSize: [20, 300, 1],
   gridX: [3, 20, 1],
@@ -54,6 +60,8 @@ export function sanitizeConfig(source = {}) {
     const v = source?.[key];
     if (typeof c[key] === "boolean") {
       if (typeof v === "boolean") c[key] = v;
+    } else if (key === "verticalFlow") {
+      if (["DOWN", "UP", "NONE"].includes(v)) c[key] = v;
     } else if (key === "responsePreset") {
       if (["SOFT", "NORMAL", "STRONG", "CUSTOM"].includes(v)) c[key] = v;
     } else if (key === "avatarStyle") {

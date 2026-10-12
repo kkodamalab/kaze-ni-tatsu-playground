@@ -20,6 +20,13 @@ export class CoordinateMapper {
   resetAvatar() {
     this.avatarReference = null;
     this.avatarOrigin = null;
+    this.worldFrames = 0;
+    this.worldHoldUntil = 0;
+    this.fullFrames = 0;
+    this.frameKey = null;
+    this.transition = null;
+    this.lastPose = null;
+    this.jointHistory = null;
   }
   point(p) {
     return [
@@ -28,74 +35,164 @@ export class CoordinateMapper {
       clamp(Number.isFinite(p.z) ? p.z : 0, -0.5, 0.5) * this.size,
     ];
   }
-  // One hip-centered coordinate frame for avatar and physical hand input.
-  avatarPose(landmarks, worldLandmarks) {
+  // Select one input coordinate system for the whole frame, then one similarity transform.
+  avatarPose(landmarks, worldLandmarks, time = performance.now()) {
     const lm = landmarks || [];
-    if (!lm.some(validLandmark)) return null;
-    const finite3 = (p) => validLandmark(p) && Number.isFinite(p.z);
-    const world =
+    const visible = (p) =>
+      validLandmark(p) &&
+      p.x >= -0.15 &&
+      p.x <= 1.15 &&
+      p.y >= -0.15 &&
+      p.y <= 1.15;
+    if (![11, 12].every((i) => visible(lm[i]))) return null;
+    const full = [23, 24, 25, 26, 27, 28].every(
+      (i) =>
+        visible(lm[i]) &&
+        Math.min(lm[i].visibility ?? 1, lm[i].presence ?? 1) >= 0.55,
+    );
+    this.fullFrames = full ? (this.fullFrames || 0) + 1 : 0;
+    const trackingMode = this.fullFrames >= 3 ? "FULL BODY" : "UPPER BODY";
+    const indices = Array.from({ length: 33 }, (_, i) => i).filter(
+      (i) => (trackingMode === "FULL BODY" || i < 23) && visible(lm[i]),
+    );
+    const finiteWorld = (p) =>
+      validLandmark(p) &&
+      Number.isFinite(p.z) &&
+      Math.max(Math.abs(p.x), Math.abs(p.y), Math.abs(p.z)) < 3;
+    const span = (input) =>
+      Math.hypot(input[11].x - input[12].x, input[11].y - input[12].y);
+    const comparable =
       worldLandmarks?.length >= 33 &&
-      [11, 12, 23, 24].every((i) => finite3(worldLandmarks[i]));
+      [
+        [11, 13],
+        [13, 15],
+        [12, 14],
+        [14, 16],
+        [0, 11],
+        [0, 12],
+        [23, 25],
+        [25, 27],
+        [24, 26],
+        [26, 28],
+      ].every(([a, b]) => {
+        if (!indices.includes(a) || !indices.includes(b)) return true;
+        if (!finiteWorld(worldLandmarks[a]) || !finiteWorld(worldLandmarks[b]))
+          return false;
+        const ratio = (p) =>
+          Math.hypot(p[a].x - p[b].x, p[a].y - p[b].y) /
+          Math.max(0.001, span(p));
+        const expected = ratio(lm),
+          actual = ratio(worldLandmarks);
+        return (
+          actual <= Math.max(0.1, expected) * 2 && actual >= expected * 0.5
+        );
+      });
+    const worldUsable =
+      comparable &&
+      worldLandmarks?.length >= 33 &&
+      indices.every((i) => finiteWorld(worldLandmarks[i])) &&
+      span(worldLandmarks) > 0.08 &&
+      Math.sign(worldLandmarks[11].x - worldLandmarks[12].x) ===
+        Math.sign(lm[11].x - lm[12].x);
+    this.worldFrames = worldUsable ? (this.worldFrames || 0) + 1 : 0;
+    if (!worldUsable && this.lastPose?.coordinateSource === "WORLD")
+      this.worldHoldUntil = time + 1000;
+    const world =
+      worldUsable &&
+      (this.lastPose?.coordinateSource === "WORLD" ||
+        (this.worldFrames >= 5 && time >= (this.worldHoldUntil || 0)));
     const input = world ? worldLandmarks : lm;
     const source = world ? "POSE WORLD" : "POSE NORMALIZED";
-    let hip, origin;
-    if ([23, 24].every((i) => validLandmark(input[i]))) {
-      hip = ["x", "y", "z"].map(
-        (k) => ((input[23][k] || 0) + (input[24][k] || 0)) / 2,
-      );
-      origin = "HIPS";
-    } else if (this.avatarOrigin?.source === source) {
-      hip = this.avatarOrigin.hip;
-      origin = "HELD HIPS";
-    } else if ([11, 12].every((i) => validLandmark(input[i]))) {
-      // Upper-body framing must not discard otherwise reliable arms/face. Estimate
-      // a display origin only; missing hips remain invalid for body wind physics.
-      hip = ["x", "y", "z"].map(
-        (k) => ((input[11][k] || 0) + (input[12][k] || 0)) / 2,
-      );
-      hip[1] += world ? 0.5 : 0.3;
-      origin = "ESTIMATED FROM SHOULDERS";
-    } else return null;
-    this.avatarOrigin = { source, hip };
-    const points = Array.from({ length: 33 }, (_, i) => {
-      const p = input[i];
-      if (!validLandmark(lm[i]) || !validLandmark(p)) return null;
-      // Monocular depth is bounded to prioritize X/Y and resist outlier Z estimates.
-      return [
-        hip[0] - p.x,
-        hip[1] - p.y,
-        clamp((Number.isFinite(p.z) ? p.z : 0) - hip[2], -1, 1),
-      ];
-    });
-    const extent = Math.max(
-      0.05,
-      ...points
-        .filter(Boolean)
-        .flatMap((p) => [Math.abs(p[0]), Math.abs(p[1])]),
+    const root = trackingMode === "FULL BODY" ? [23, 24] : [11, 12];
+    const center = ["x", "y", "z"].map(
+      (k) => ((input[root[0]][k] || 0) + (input[root[1]][k] || 0)) / 2,
     );
-    // Freeze the initial display scale so lifting a hand does not shrink the whole body.
-    if (this.avatarReference?.source !== source)
-      this.avatarReference = { source, extent };
-    const reference = this.avatarReference.extent;
-    const scale = (this.size * 0.15) / reference;
-    const mappedPoints = points.map((p) =>
-      p
+    const raw = Array.from({ length: 33 }, (_, i) =>
+      indices.includes(i)
         ? [
-            p[0] * scale,
-            p[1] * scale,
-            clamp(p[2], -reference * 0.7, reference * 0.7) * scale,
+            center[0] - input[i].x,
+            center[1] - input[i].y,
+            clamp((input[i].z || 0) - center[2], -span(input), span(input)) *
+              0.45,
           ]
         : null,
     );
-    return {
-      points: mappedPoints,
+    const extent = Math.max(
+      0.01,
+      ...raw.filter(Boolean).flatMap((p) => p.map(Math.abs)),
+    );
+    const desired = Math.min(
+      4 / Math.max(0.05, span(input)),
+      (this.size * 0.44) / extent,
+    );
+    if (this.avatarReference?.source !== source)
+      this.avatarReference = { source, scale: desired };
+    // A single uniform fit preserves arm proportions; no individual coordinate clipping.
+    const scale = Math.min(this.avatarReference.scale, desired);
+    let points = raw.map((p) => (p ? p.map((v) => v * scale) : null));
+    const key = source + "/" + trackingMode;
+    if (this.frameKey && this.frameKey !== key)
+      this.transition = { start: time, points: this.lastPose.points };
+    const progress = this.transition
+      ? clamp((time - this.transition.start) / 250, 0, 1)
+      : 1;
+    if (progress < 1)
+      points = points.map((p, i) =>
+        p && this.transition.points[i]
+          ? p.map(
+              (v, k) =>
+                this.transition.points[i][k] +
+                (v - this.transition.points[i][k]) * progress,
+            )
+          : p,
+      );
+    else this.transition = null;
+    const validCount = points.filter(Boolean).length;
+    const wrists = { left: points[15], right: points[16] };
+    // Briefly retain missing upper joints for display only; physical input remains missing.
+    this.jointHistory ||= Array(33).fill(null);
+    points = points.map((p, i) => {
+      if (p) {
+        this.jointHistory[i] = { point: p, time };
+        return p;
+      }
+      if (
+        i < 23 &&
+        this.jointHistory[i] &&
+        time - this.jointHistory[i].time < 150
+      )
+        return this.jointHistory[i].point;
+      return null;
+    });
+    let bodyAxis = null;
+    if (trackingMode === "FULL BODY") {
+      const shoulder = ["x", "y", "z"].map(
+        (k) => ((input[11][k] || 0) + (input[12][k] || 0)) / 2,
+      );
+      const hip = ["x", "y", "z"].map(
+        (k) => ((input[23][k] || 0) + (input[24][k] || 0)) / 2,
+      );
+      const height = Math.max(0.05, hip[1] - shoulder[1]);
+      bodyAxis = [
+        clamp((hip[0] - shoulder[0]) / height, -1, 1),
+        0,
+        clamp(((shoulder[2] - hip[2]) * 0.45) / height, -1, 1),
+      ];
+    }
+    const frame = {
+      points,
+      bodyAxis,
       source,
-      origin,
-      windHands: {
-        left: mappedPoints[15],
-        right: mappedPoints[16],
-      },
+      coordinateSource: world ? "WORLD" : "NORMALIZED",
+      trackingMode,
+      origin: trackingMode === "FULL BODY" ? "HIP CENTER" : "SHOULDER CENTER",
+      validCount,
+      transitioning: progress < 1,
+      windHands: wrists,
     };
+    this.frameKey = key;
+    this.lastPose = frame;
+    return frame;
   }
   syntheticPose(sample) {
     if (
@@ -147,11 +244,24 @@ export class CoordinateMapper {
       windHands: { left: points[15], right: points[16] },
     };
   }
-  fromPose(landmarks, worldLandmarks) {
+  fromPose(landmarks, worldLandmarks, acceptedFrame) {
     const lm = landmarks || [];
-    const frame = this.avatarPose(lm, worldLandmarks);
+    const frame =
+      acceptedFrame === undefined
+        ? this.avatarPose(lm, worldLandmarks)
+        : acceptedFrame;
+    if (frame?.bodyAxis)
+      return {
+        detected: true,
+        body: frame.bodyAxis,
+        left: frame.windHands.left,
+        right: frame.windHands.right,
+      };
     let body = null;
-    if (frame && [11, 12, 23, 24].every((i) => frame.points[i])) {
+    if (
+      frame?.trackingMode === "FULL BODY" &&
+      [11, 12, 23, 24].every((i) => frame.points[i])
+    ) {
       const shoulder = [0, 1, 2].map(
         (k) => (frame.points[11][k] + frame.points[12][k]) / 2,
       );
@@ -163,6 +273,7 @@ export class CoordinateMapper {
       ];
     }
     return {
+      detected: !!frame && frame.validCount > 0,
       body,
       left: frame?.windHands.left || null,
       right: frame?.windHands.right || null,

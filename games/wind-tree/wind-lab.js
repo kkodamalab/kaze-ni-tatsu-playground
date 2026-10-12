@@ -22,6 +22,11 @@ import {
 } from "./src/wind-lab/TrackingReport.js";
 import { POSE_TESTS, poseSequence } from "./src/wind-lab/PoseSequences.js";
 const groups = {
+  "PARTICLE FLOW": [
+    ["ambient", "AMBIENT FLOW"],
+    ["ambientSpeed", "AMBIENT SPEED %"],
+    ["drift", "DRIFT / TURBULENCE %"],
+  ],
   AVATAR: [
     ["avatar", "3D AVATAR"],
     ["avatarSize", "AVATAR SIZE %"],
@@ -116,6 +121,7 @@ export class WindLab {
       this.controls.minDistance = 8;
       this.controls.maxDistance = 90;
       this.resetView();
+      this.bindDirect();
       this.field = new ParticleField(this.scene, this.engine);
       this.debug = new WindDebug(this.scene, this.engine);
       this.modes = new SceneModes(
@@ -154,6 +160,39 @@ export class WindLab {
       throw e;
     }
   }
+  bindDirect() {
+    const canvas = this.renderer.domElement;
+    const ray = new THREE.Raycaster(),
+      plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0),
+      hit = new THREE.Vector3();
+    const move = (event) => {
+      if (!this.direct || !this.directDragging) return;
+      const rect = canvas.getBoundingClientRect();
+      ray.setFromCamera(
+        new THREE.Vector2(
+          ((event.clientX - rect.left) / rect.width) * 2 - 1,
+          1 - ((event.clientY - rect.top) / rect.height) * 2,
+        ),
+        this.view,
+      );
+      if (ray.ray.intersectPlane(plane, hit))
+        this.directHands[this.$("#labDirectSide").value] = [
+          hit.x,
+          hit.y,
+          hit.z,
+        ].map((v) => Math.max(-9, Math.min(9, v)));
+    };
+    canvas.onpointerdown = (event) => {
+      if (!this.direct) return;
+      this.directDragging = true;
+      canvas.setPointerCapture(event.pointerId);
+      move(event);
+    };
+    canvas.onpointermove = move;
+    canvas.onpointerup = canvas.onpointercancel = () => {
+      this.directDragging = false;
+    };
+  }
   mount() {
     const c = this.store.values;
     const settings =
@@ -161,10 +200,10 @@ export class WindLab {
       Object.entries(groups)
         .map(
           ([name, fields]) =>
-            `<fieldset><legend>${name}</legend>${name === "WEATHER" ? `<p>位置情報をOpen-Meteoへ送信して、周辺の大まかな風を表示します。正確な位置は保存しません。</p><button id="labGps">現在地の風を取得 / GPS WEATHER</button><p>MANUAL LOCATION：デモ地点は南大沢周辺（現在地ではありません）。座標は保存しません。</p><label>緯度 <input id="labLatitude" type="number" min="-90" max="90" step="any" value="35.61"></label><label>経度 <input id="labLongitude" type="number" min="-180" max="180" step="any" value="139.38"></label><button id="labManual">手動地点の風を取得</button><button id="labSimulated">SIMULATED WIND</button><p><a href="https://open-meteo.com/" target="_blank" rel="noopener">Weather data by Open-Meteo</a>（予測値）</p>` : ""}${fields.map(([key, label]) => (typeof c[key] === "boolean" ? `<label><input id="lab-${key}" data-key="${key}" type="checkbox" ${c[key] ? "checked" : ""}> ${label}</label>` : `<label for="lab-${key}">${label}<output id="lab-value-${key}">${c[key]}</output><input id="lab-${key}" data-key="${key}" type="range" min="${RANGES[key][0]}" max="${RANGES[key][1]}" step="${RANGES[key][2]}" value="${c[key]}"></label>`)).join("")}${name === "AVATAR" ? `<label><input id="lab-avatar-axes" data-key="axes" type="checkbox" ${c.axes ? "checked" : ""}> XYZ AXIS</label><label for="lab-avatarStyle">AVATAR STYLE<select id="lab-avatarStyle" data-key="avatarStyle"><option value="SKELETON" ${c.avatarStyle === "SKELETON" ? "selected" : ""}>SKELETON</option><option value="POINTS" ${c.avatarStyle === "POINTS" ? "selected" : ""}>POINTS</option></select></label><p>腰中心の表示用骨格。推定奥行きは目安です。手首は風の中心に固定。サイズは胴体などの表示倍率を変え、風の位置・半径は変更しません。</p>` : ""}${name === "PARTICLES" ? '<button id="labResetParticles">PARTICLE RESET</button><button id="labResetView">CAMERA VIEW RESET</button>' : ""}${name === "BODY" ? '<button id="labCalibrate">CALIBRATE</button><p>現在の姿勢をニュートラルにします。奥行きは単眼推定の目安です。</p>' : ""}</fieldset>`,
+            `<fieldset><legend>${name}</legend>${name === "WEATHER" ? `<p>位置情報をOpen-Meteoへ送信して、周辺の大まかな風を表示します。正確な位置は保存しません。</p><button id="labGps">現在地の風を取得 / GPS WEATHER</button><p>MANUAL LOCATION：デモ地点は南大沢周辺（現在地ではありません）。座標は保存しません。</p><label>緯度 <input id="labLatitude" type="number" min="-90" max="90" step="any" value="35.61"></label><label>経度 <input id="labLongitude" type="number" min="-180" max="180" step="any" value="139.38"></label><button id="labManual">手動地点の風を取得</button><button id="labSimulated">SIMULATED WIND</button><p><a href="https://open-meteo.com/" target="_blank" rel="noopener">Weather data by Open-Meteo</a>（予測値）</p>` : ""}${fields.map(([key, label]) => (typeof c[key] === "boolean" ? `<label><input id="lab-${key}" data-key="${key}" type="checkbox" ${c[key] ? "checked" : ""}> ${label}</label>` : `<label for="lab-${key}">${label}<output id="lab-value-${key}">${c[key]}</output><input id="lab-${key}" data-key="${key}" type="range" min="${RANGES[key][0]}" max="${RANGES[key][1]}" step="${RANGES[key][2]}" value="${c[key]}"></label>`)).join("")}${name === "AVATAR" ? `<label><input id="lab-avatar-axes" data-key="axes" type="checkbox" ${c.axes ? "checked" : ""}> XYZ AXIS</label><label for="lab-avatarStyle">AVATAR STYLE<select id="lab-avatarStyle" data-key="avatarStyle"><option value="SKELETON" ${c.avatarStyle === "SKELETON" ? "selected" : ""}>SKELETON</option><option value="POINTS" ${c.avatarStyle === "POINTS" ? "selected" : ""}>POINTS</option></select></label><p>腰中心の表示用骨格。推定奥行きは目安です。手首は風の中心に固定。サイズは胴体などの表示倍率を変え、風の位置・半径は変更しません。</p>` : ""}${name === "PARTICLE FLOW" ? `<label>VERTICAL FLOW<select id="lab-verticalFlow" data-key="verticalFlow"><option>DOWN</option><option>UP</option><option>NONE</option></select></label>` : ""}${name === "PARTICLES" ? '<button id="labResetParticles">PARTICLE RESET</button><button id="labResetView">CAMERA VIEW RESET</button>' : ""}${name === "BODY" ? '<button id="labCalibrate">CALIBRATE</button><p>現在の姿勢をニュートラルにします。奥行きは単眼推定の目安です。</p>' : ""}</fieldset>`,
         )
         .join("");
-    this.root.innerHTML = `<header class="lab-header"><h1>3D WIND LAB</h1><nav aria-label="DISPLAY MODE">${["DOT", "KIDS", "ART"].map((mode) => `<button data-mode="${mode}" aria-pressed="${mode === "DOT"}">${mode}</button>`).join("")}</nav><div class="lab-weather"><p id="labWeatherStatus" class="lab-status" role="status"></p><small id="labWeatherDetails"></small></div><div><button id="labCamera" aria-pressed="false">CAMERA OFF</button><button id="labSkeleton" aria-pressed="false">SKELETON OFF</button><button id="labPc" aria-pressed="true">PC TEST ON</button><button id="labExit">ゲームに戻る</button></div></header><div id="labMessage" class="lab-toast" role="status"></div><div class="lab-layout"><div class="lab-stage"><div class="lab-preview hidden"><canvas id="labSkeletonCanvas"></canvas></div><pre id="labAvatarStatus" class="lab-avatar-status" role="status" hidden></pre><div class="lab-caption">ドラッグ / タッチで回転・ピンチでズーム<br>+X 東（右） / +Y 上 / -Z 北（奥）<br>マゼンタ = 左手 / アンバー = 右手</div></div><aside class="lab-settings">${settings}<fieldset id="labPcPanel"><legend>PC TEST</legend><label>合成33点Pose<select id="labPoseTest"><option value="">MANUAL / AUTO MOTION</option>${Object.entries(
+    this.root.innerHTML = `<header class="lab-header"><h1>3D WIND LAB</h1><nav aria-label="DISPLAY MODE">${["DOT", "KIDS", "ART"].map((mode) => `<button data-mode="${mode}" aria-pressed="${mode === "DOT"}">${mode}</button>`).join("")}</nav><div class="lab-weather"><p id="labWeatherStatus" class="lab-status" role="status"></p><small id="labWeatherDetails"></small></div><div><button id="labCamera" aria-pressed="false">CAMERA OFF</button><button id="labSkeleton" aria-pressed="false">SKELETON OFF</button><button id="labPc" aria-pressed="true">PC TEST ON</button><button id="labExit">ゲームに戻る</button></div></header><div id="labMessage" class="lab-toast" role="status"></div><div class="lab-layout"><div class="lab-stage"><div class="lab-preview hidden"><canvas id="labSkeletonCanvas"></canvas></div><pre id="labAvatarStatus" class="lab-avatar-status" role="status" hidden></pre><div class="lab-caption">ドラッグ / タッチで回転・ピンチでズーム<br>+X 東（右） / +Y 上 / -Z 北（奥）<br>マゼンタ = 左手 / アンバー = 右手</div></div><aside class="lab-settings">${settings}<fieldset><legend>DIRECT HAND TEST</legend><button id="labDirect" aria-pressed="false">DIRECT HAND TEST OFF</button><label>操作する手<select id="labDirectSide"><option value="left">LEFT / マゼンタ</option><option value="right">RIGHT / アンバー</option></select></label><p>3D画面をドラッグして手の球を動かします。PC・Poseと同じHandWindを使用します。</p></fieldset><fieldset id="labPcPanel"><legend>PC TEST</legend><label>合成33点Pose<select id="labPoseTest"><option value="">MANUAL / AUTO MOTION</option>${Object.entries(
       POSE_TESTS,
     )
       .map(
@@ -195,6 +234,20 @@ export class WindLab {
         responsePreset: name,
       });
     });
+    this.$("#lab-verticalFlow").value = c.verticalFlow;
+    this.$("#labDirect").onclick = async () => {
+      if (this.cameraPending) return;
+      if (this.cameraOn) await this.toggleCamera();
+      this.direct = !this.direct;
+      this.pc = false;
+      this.directHands ||= { left: [-4, 0, 0], right: [4, 0, 0] };
+      this.controls.enabled = !this.direct;
+      this.toggleButton("labDirect", "DIRECT HAND TEST", this.direct);
+      this.toggleButton("labPc", "PC TEST", false);
+      this.$("#labPcPanel").hidden = true;
+      this.engine.suspend();
+      if (this.direct) this.apply({ ...this.store.values, handDebug: true });
+    };
     this.stage = this.$(".lab-stage");
     this.preview = this.$(".lab-preview");
     this.preview.prepend(this.video);
@@ -267,6 +320,9 @@ export class WindLab {
       this.toggleButton("labSkeleton", "SKELETON", this.skeleton);
     };
     this.$("#labPc").onclick = () => {
+      this.direct = false;
+      this.controls.enabled = true;
+      this.toggleButton("labDirect", "DIRECT HAND TEST", false);
       this.pc = !this.pc;
       if (this.pc) {
         this.play?.stopPhotos();
@@ -298,6 +354,7 @@ export class WindLab {
           ["weather", "body", "left", "right"].forEach(
             (k, j) => (c[k] = i === 4 || i === j),
           );
+          c.ambient = i === 4;
           this.apply(c);
         }),
     );
@@ -305,14 +362,22 @@ export class WindLab {
   acceptInput(sample, time, source = "sensor") {
     this.engine.input(sample, time);
     this.play?.acceptInput(sample, time, source);
-    if (source === "pc")
-      this.avatar?.input(this.mapper.syntheticPose(sample), time);
+    if (source === "pc" || source === "direct")
+      this.avatar?.input(
+        {
+          ...this.mapper.syntheticPose(sample),
+          source:
+            source === "direct" ? "DIRECT HAND TEST" : "PC TEST SYNTHETIC",
+        },
+        time,
+      );
   }
   getSelectedGift() {
     return this.play?.getSelectedGift() || null;
   }
   setMode(mode) {
     if (!this.modes || this.mode === mode) return;
+    this.resumeGraphics();
     this.mode = mode;
     this.modes.setMode(mode);
     this.root.dataset.displayMode = mode;
@@ -371,6 +436,9 @@ export class WindLab {
   }
   async toggleCamera() {
     if (this.cameraPending) return;
+    this.direct = false;
+    this.controls.enabled = true;
+    this.toggleButton("labDirect", "DIRECT HAND TEST", false);
     if (this.cameraOn) {
       this.play?.stopPhotos();
       this.cameraOn = false;
@@ -441,11 +509,13 @@ export class WindLab {
   }
   frame(t) {
     this.raf = null;
-    if (this.disposed || document.hidden) return;
+    if (this.disposed || this.graphicsPaused || document.hidden) return;
     const dt = this.last ? Math.min((t - this.last) / 1000, 0.1) : 0;
     this.last = t;
     this.diagnostics.renderFrames++;
-    if (this.pc) {
+    if (this.direct) {
+      this.acceptInput({ body: [0, 0, 0], ...this.directHands }, t, "direct");
+    } else if (this.pc) {
       if (this.poseTest) {
         const result = poseSequence(
             this.poseTest,
@@ -454,9 +524,10 @@ export class WindLab {
           frame = this.mapper.avatarPose(
             result.landmarks,
             result.worldLandmarks,
+            t,
           );
         this.acceptInput(
-          this.mapper.fromPose(result.landmarks, result.worldLandmarks),
+          this.mapper.fromPose(result.landmarks, result.worldLandmarks, frame),
           t,
           "synthetic_pose",
         );
@@ -489,15 +560,20 @@ export class WindLab {
             const lm = recent ? result?.landmarks?.[0] : null;
             this.diagnostics.poseFrames++;
             this.diagnostics.landmarkCount = lm?.length || 0;
+            const poseFrame = this.mapper.avatarPose(
+              lm,
+              result?.worldLandmarks?.[0],
+              result?.timestamp ?? t,
+            );
+            if (poseFrame?.transitioning) {
+              this.engine.left.previous = this.engine.right.previous = null;
+            }
             this.acceptInput(
-              this.mapper.fromPose(lm, result?.worldLandmarks?.[0]),
+              this.mapper.fromPose(lm, result?.worldLandmarks?.[0], poseFrame),
               t,
               "pose",
             );
-            this.avatar.input(
-              this.mapper.avatarPose(lm, result?.worldLandmarks?.[0]),
-              t,
-            );
+            this.avatar.input(poseFrame, t);
             this.lastDetection = lm ? t : 0;
             this.skeletonDraw(lm);
           }
@@ -581,10 +657,62 @@ export class WindLab {
       }
       this.slowFrames = 0;
     }
+    if (state?.phase === "finished" && this.mode !== "DOT") {
+      this.finishGraphics();
+      return;
+    }
     this.raf = requestAnimationFrame((time) => this.frame(time));
   }
+  finishGraphics() {
+    if (this.graphicsPaused) return;
+    // Keep the grown tree/results as a CPU canvas, then release the live capture and GPU.
+    const image = document.createElement("canvas");
+    image.width = this.renderer.domElement.width;
+    image.height = this.renderer.domElement.height;
+    image.getContext("2d").drawImage(this.renderer.domElement, 0, 0);
+    image.setAttribute("aria-label", "終了時の風の木");
+    this.renderer.domElement.replaceWith(image);
+    this.resultCanvas = image;
+    this.camera.stop();
+    this.camera.release?.();
+    this.cameraOn = false;
+    this.preview.classList.add("hidden");
+    this.skeletonDraw(null);
+    this.toggleButton("labCamera", "CAMERA", false);
+    this.$("#labCamera").disabled = true;
+    this.engine.suspend();
+    this.avatar.resetTracking();
+    this.directDragging = false;
+    this.controls.dispose();
+    this.renderer.dispose();
+    this.renderer.forceContextLoss();
+    this.graphicsPaused = true;
+    this.raf = null;
+  }
+  resumeGraphics() {
+    if (!this.graphicsPaused || this.disposed) return;
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+    this.renderer.setClearColor(0x07111c);
+    this.resultCanvas?.remove();
+    this.resultCanvas = null;
+    this.stage.prepend(this.renderer.domElement);
+    const target = this.controls.target.clone();
+    this.controls = new OrbitControls(this.view, this.renderer.domElement);
+    this.controls.target.copy(target);
+    this.controls.enableDamping = true;
+    this.controls.minDistance = 8;
+    this.controls.maxDistance = 90;
+    this.controls.enabled = !this.direct;
+    this.bindDirect();
+    this.graphicsPaused = false;
+    this.$("#labCamera").disabled = false;
+    this.last = 0;
+    this.resize();
+    this.raf = requestAnimationFrame((t) => this.frame(t));
+  }
   resize() {
-    if (!this.renderer) return;
+    if (!this.renderer || this.graphicsPaused) return;
     const width = this.stage.clientWidth,
       height = this.stage.clientHeight;
     if (!width || !height) return;
@@ -597,7 +725,7 @@ export class WindLab {
     const damping = this.controls.enableDamping;
     this.controls.enableDamping = false;
     this.controls.update(); // Consume gesture inertia before restoring the view.
-    this.view.position.set(25, 18, 32);
+    this.view.position.set(0, 1, 38);
     this.controls.target.set(0, 0, 0);
     this.controls.update();
     this.controls.enableDamping = damping;

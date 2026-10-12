@@ -31,6 +31,10 @@ export class ParticleField {
       { length: this.samples },
       () => new Float32Array(e.positions.length),
     );
+    this.epochs = Array.from(
+      { length: this.samples },
+      () => new Uint32Array(e.count),
+    );
     this.times = new Float64Array(this.samples).fill(-Infinity);
     this.cursor = 0;
     this.lastSample = -Infinity;
@@ -134,6 +138,7 @@ export class ParticleField {
   capture() {
     const e = this.engine;
     this.history[this.cursor].set(e.positions);
+    this.epochs[this.cursor].set(e.generations);
     this.times[this.cursor] = e.time;
     this.cursor = (this.cursor + 1) % this.samples;
     this.lastSample = e.time;
@@ -154,6 +159,11 @@ export class ParticleField {
       const p = this.history[a],
         q = this.history[b];
       for (let j = 0; j < p.length; j += 3) {
+        if (
+          this.epochs[a][j / 3] !== this.epochs[b][j / 3] ||
+          this.epochs[a][j / 3] !== this.engine.generations[j / 3]
+        )
+          continue;
         if (
           Math.abs(p[j] - q[j]) > SPACE_SIZE / 2 ||
           Math.abs(p[j + 1] - q[j + 1]) > SPACE_SIZE / 2 ||
@@ -180,6 +190,10 @@ export class ParticleField {
     this.geometry.attributes.position.needsUpdate = true;
     this.trails.visible = c.trail && c.trailDuration > 0;
     this.trailMaterial.opacity = c.trailOpacity / 100;
+    if (this.seenRecycleVersion !== this.engine.recycleVersion) {
+      this.seenRecycleVersion = this.engine.recycleVersion;
+      this.drawHistory();
+    }
     const interval = Math.max(0.1, c.trailDuration / (this.samples - 1));
     if (this.engine.time - this.lastSample >= interval) this.capture();
   }
@@ -193,7 +207,7 @@ export class ParticleField {
       }
     }
     this.points = this.trails = null;
-    this.history = this.trailArray = null;
+    this.history = this.trailArray = this.epochs = null;
     this.geometry =
       this.trailGeometry =
       this.material =

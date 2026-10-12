@@ -97,7 +97,9 @@ export class LabPlay {
     );
   }
   acceptInput(sample, time, source) {
-    const valid = !!sample?.body && sample.body.every(Number.isFinite);
+    const valid =
+      sample?.detected === true ||
+      (!!sample?.body && sample.body.every(Number.isFinite));
     this.growth.heartbeat(time, { valid, source });
   }
   start() {
@@ -164,7 +166,7 @@ export class LabPlay {
       ? "からだが見える場所に戻ってね"
       : this.lab.pc
         ? "PC TEST"
-        : this.lab.cameraOn && this.lab.engine.body.age <= 0.25
+        : this.lab.cameraOn && this.lab.avatar?.state === "DETECTED"
           ? "からだを見つけたよ"
           : "入力待ち";
     this.$("#labPlayStatus").textContent =
@@ -235,6 +237,7 @@ export class LabPlay {
     this.lab.avatar?.resetTracking();
     this.lab.engine?.reset();
     this.lab.field?.rebuild();
+    this.lab.resumeGraphics?.();
     this.sync(performance.now());
   }
   downloadCsv() {
