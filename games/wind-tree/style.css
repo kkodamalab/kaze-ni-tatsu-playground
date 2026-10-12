@@ -1,0 +1,488 @@
+:root {
+  font-family:
+    system-ui,
+    -apple-system,
+    "Noto Sans JP",
+    sans-serif;
+  color: #173b2a;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#app {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+#app {
+  position: relative;
+  background: linear-gradient(#72c9ef 0 62%, #8ccf65 62%);
+}
+#camera,
+#world {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+#camera {
+  transform: scaleX(-1);
+  opacity: 0.14;
+}
+#world {
+  z-index: 2;
+}
+#hud {
+  position: absolute;
+  z-index: 4;
+  top: 10px;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.brand {
+  font-weight: 900;
+  font-size: clamp(18px, 3vw, 30px);
+  text-shadow: 0 2px 10px #fff;
+}
+.brand small {
+  display: block;
+  font-size: 0.45em;
+}
+#timer {
+  background: #fff9;
+  border-radius: 99px;
+  padding: 8px 15px;
+  font-size: 26px;
+  font-weight: 900;
+}
+.panel {
+  z-index: 10;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(92%, 520px);
+  padding: 26px;
+  text-align: center;
+  background: #fffffff0;
+  border-radius: 28px;
+  box-shadow: 0 15px 50px #0003;
+}
+.panel h1 {
+  font-size: clamp(28px, 7vw, 48px);
+  margin: 0.2em;
+}
+.panel p {
+  font-size: clamp(19px, 4vw, 28px);
+  font-weight: 800;
+  line-height: 1.6;
+}
+button,
+select {
+  font: inherit;
+  border: 0;
+  border-radius: 18px;
+  padding: 14px 18px;
+  margin: 7px;
+  font-weight: 800;
+}
+button {
+  background: #287a4a;
+  color: white;
+  cursor: pointer;
+}
+.secondary {
+  background: #456579;
+}
+.hint {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+.hidden {
+  display: none !important;
+}
+.dev {
+  position: absolute;
+  z-index: 12;
+  bottom: 12px;
+  left: 12px;
+  background: #ffffffe8;
+  padding: 12px;
+  border-radius: 14px;
+  max-width: 430px;
+}
+.dev label {
+  display: block;
+  margin: 5px;
+}
+.corner {
+  position: absolute;
+  z-index: 13;
+  right: 10px;
+  bottom: 10px;
+  font-size: 12px;
+  padding: 8px;
+  background: #173b2acc;
+}
+#research {
+  max-height: 48vh;
+  overflow: auto;
+}
+#research pre {
+  font-size: 11px;
+}
+#message {
+  position: absolute;
+  z-index: 6;
+  top: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: clamp(28px, 7vw, 62px);
+  font-weight: 1000;
+  color: white;
+  text-shadow: 0 4px 15px #174b35;
+  pointer-events: none;
+}
+#skeletonToggle {
+  position: absolute;
+  z-index: 14;
+  right: 10px;
+  top: 72px;
+  margin: 0;
+  padding: 10px 13px;
+  border: 2px solid #fff;
+  background: #173b2acc;
+  font-size: clamp(11px, 2.4vw, 14px);
+  touch-action: manipulation;
+}
+#skeletonToggle[aria-pressed="true"] {
+  background: #e8ff46;
+  color: #173b2a;
+  border-color: #173b2a;
+}
+#skeletonHud {
+  position: absolute;
+  z-index: 7;
+  top: 122px;
+  right: 10px;
+  display: grid;
+  gap: 2px;
+  min-width: 176px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: #071b19d9;
+  color: #eaffec;
+  font:
+    700 12px/1.35 ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+  box-shadow: 0 2px 10px #0004;
+  pointer-events: none;
+}
+#skeletonHud b {
+  color: #79ff91;
+}
+@media (max-width: 560px) {
+  #skeletonToggle {
+    top: 66px;
+  }
+  #skeletonHud {
+    top: 112px;
+    font-size: 10px;
+    min-width: 158px;
+  }
+  .dev {
+    max-width: calc(100% - 24px);
+  }
+}
+
+#world {
+  touch-action: none;
+}
+#testPanel {
+  max-height: 42vh;
+  overflow: auto;
+}
+#testPanel .demoHint {
+  font-size: 12px;
+  max-width: 320px;
+  margin: 6px;
+}
+#testPanel input {
+  max-width: 45vw;
+}
+
+.panel {
+  max-height: 92dvh;
+  overflow: auto;
+}
+#start h1,
+#finish h1 {
+  font-size: clamp(24px, 5vw, 36px);
+}
+#start > p {
+  font-size: clamp(16px, 3vw, 20px);
+  line-height: 1.4;
+}
+.settings {
+  text-align: left;
+  border: 1px solid #93aa97;
+  border-radius: 12px;
+  margin: 12px 0;
+  padding: 10px;
+  font-size: 14px;
+}
+.settings label {
+  display: block;
+  margin: 8px 0;
+}
+.settings input[type="range"] {
+  width: 100%;
+  accent-color: #287a4a;
+}
+.settings .hint,
+#finish .hint {
+  font-size: 12px !important;
+  line-height: 1.5;
+  font-weight: 500;
+}
+.settings input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  vertical-align: middle;
+}
+.durationInputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#durationNumber {
+  width: 70px;
+  padding: 5px;
+  font: inherit;
+}
+.settingError {
+  color: #a52717;
+  font-size: 13px !important;
+  margin: 0;
+}
+.consent {
+  font-weight: 700;
+}
+#photoStatus {
+  position: absolute;
+  z-index: 5;
+  top: 68px;
+  left: 12px;
+  max-width: 55%;
+  background: #ffffffe6;
+  border-radius: 8px;
+  padding: 5px;
+  font-size: 12px;
+}
+#stopPhotoBtn {
+  position: absolute;
+  z-index: 14;
+  top: 105px;
+  left: 12px;
+  padding: 8px;
+  font-size: 12px;
+}
+.photoGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.photoThumb {
+  padding: 4px;
+  margin: 0;
+  border-radius: 8px;
+  background: #eaf3ec;
+  color: #173b2a;
+  font-size: 11px;
+  border: 3px solid transparent;
+}
+.photoThumb img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4/3;
+  object-fit: cover;
+  border-radius: 5px;
+}
+.photoThumb[aria-pressed="true"] {
+  border-color: #287a4a;
+  background: #d7f6b2;
+}
+.photoActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+#photoDialog {
+  max-width: 95vw;
+  max-height: 95dvh;
+  border: 0;
+  border-radius: 16px;
+  text-align: center;
+  color: #173b2a;
+}
+#photoPreview {
+  display: block;
+  max-width: 80vw;
+  max-height: 65dvh;
+  object-fit: contain;
+  margin: auto;
+}
+#photoDialog::backdrop {
+  background: #0009;
+}
+#app:has(#start:not(.hidden))
+  :is(#hud, #skeletonToggle, #skeletonHud, #researchToggle, #photoStatus) {
+  display: none;
+}
+
+/* Home uses the page scroll, never an independently scrolling card. */
+html:has(#start:not(.hidden)),
+body:has(#start:not(.hidden)) {
+  height: auto;
+  min-height: 100%;
+  overflow: auto;
+}
+#app:has(#start:not(.hidden)) {
+  height: auto;
+  min-height: 100dvh;
+  overflow: visible;
+  background: #f2f4e9;
+}
+#app:has(#start:not(.hidden)) #world {
+  position: fixed;
+  opacity: 0.12;
+  pointer-events: none;
+}
+#app:has(#start:not(.hidden)) #camera {
+  display: none;
+}
+#start {
+  position: relative;
+  left: auto;
+  top: auto;
+  transform: none;
+  margin: 0 auto;
+  width: min(92%, 620px);
+  max-height: none;
+  overflow: visible;
+  padding: 56px 24px 40px;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+#start h1 {
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin: 12px 0 20px;
+}
+#start .home-eyebrow {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  color: #527360;
+}
+#start .home-description {
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.9;
+  color: #4e6456;
+}
+#start .home-duration {
+  text-align: left;
+  max-width: 360px;
+  margin: 28px auto 16px;
+  font-size: 14px;
+}
+#startBtn {
+  display: block;
+  width: min(100%, 360px);
+  margin: 12px auto;
+  border-radius: 12px;
+  min-height: 58px;
+  font-size: 18px;
+  background: #225c44;
+}
+#start .home-other {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+#start .home-other button {
+  font-size: 12px;
+  font-weight: 500;
+  margin: 0;
+  background: transparent;
+  color: #225c44;
+  border-radius: 8px;
+  min-height: 44px;
+}
+#start .hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: #536957;
+  line-height: 1.7;
+}
+#homeDetails {
+  margin: 24px auto 0;
+  text-align: left;
+  max-width: 440px;
+}
+#homeDetails summary {
+  cursor: pointer;
+  padding: 14px 0;
+  min-height: 44px;
+  color: #345c45;
+}
+#homeDetails .settings {
+  border: 0;
+  border-radius: 0;
+  margin: 12px 0;
+  padding: 12px 0;
+}
+#homeDetails legend {
+  font-size: 13px;
+  font-weight: 600;
+}
+#homeDetails label {
+  font-size: 14px;
+  line-height: 1.8;
+}
+#homeDetails input[type="checkbox"] {
+  accent-color: #225c44;
+  min-width: 18px;
+  min-height: 18px;
+}
+@media (max-width: 600px) {
+  #start {
+    padding: 32px 10px;
+  }
+  #start h1 {
+    font-size: 29px;
+  }
+  .home-other {
+    gap: 4px !important;
+  }
+}
+#start input[type="range"] {
+  accent-color: #225c44;
+}
