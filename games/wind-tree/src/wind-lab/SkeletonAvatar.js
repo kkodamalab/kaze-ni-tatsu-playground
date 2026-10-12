@@ -85,6 +85,9 @@ export class SkeletonAvatar {
     this.lastInput = now;
     this.source = frame.source;
     this.origin = frame.origin || "SYNTHETIC";
+    this.trackingMode = frame.trackingMode || "SYNTHETIC";
+    this.coordinateSource = frame.coordinateSource || "SYNTHETIC";
+    this.inputValidCount = frame.validCount;
   }
   resetTracking() {
     this.lastInput = null;
@@ -187,7 +190,7 @@ export class SkeletonAvatar {
           for (let k = 0; k < 3; k++)
             this.lineBuffer[lines++] = this.rendered[i * 3 + k];
       }
-    this.validCount = age <= 250 ? count : 0;
+    this.validCount = age <= 250 ? (this.inputValidCount ?? count) : 0;
     this.heldCount = count;
     this.jointGeometry.setDrawRange(0, count);
     this.lineGeometry.setDrawRange(0, lines / 3);
@@ -203,7 +206,7 @@ export class SkeletonAvatar {
   }
   text() {
     const f = (v) => (v ? v.map((n) => n.toFixed(2)).join(", ") : "—");
-    return `AVATAR INPUT ${this.source} | ${this.state || "LOST"}\nVALID LANDMARKS ${this.validCount || 0}/33 (held ${this.heldCount || 0})\nLAST POSE AGE ${Number.isFinite(this.poseAge) ? Math.round(this.poseAge) + " ms" : "—"}\nRENDER VISIBLE ${this.group.visible ? "YES" : "NO"} | points ${this.jointGeometry.drawRange.count} / lines ${this.lineGeometry.drawRange.count / 2}\nHIDDEN REASON ${this.hiddenReason || "NO VALID POSE"} | ORIGIN ${this.origin || "NONE"}\n3D AVATAR ${this.config?.avatar ? "ON" : "OFF"} | ${this.config?.avatarSize || 100}% / ${this.config?.avatarStyle || "SKELETON"}\nAVATAR display scale ${(this.displayScale || 1).toFixed(2)} (visual only)\nAVATAR LEFT wrist (${f(this.wrist("left"))})\nAVATAR RIGHT wrist (${f(this.wrist("right"))})\nShared coordinates (origin reported above). Wrist anchors = accepted HandWind positions at every display size.`;
+    return `POSE SOURCE ${this.source} | POSE AGE ${Number.isFinite(this.poseAge) ? Math.round(this.poseAge) : "—"} ms\nCOORDINATE SOURCE ${this.coordinateSource || "NONE"}\nTRACKING MODE ${this.trackingMode || "LOST"}\nAVATAR INPUT ${this.source} | ${this.state || "LOST"}\nVALID LANDMARKS ${this.validCount || 0}/33 (held ${this.heldCount || 0})\nLAST POSE AGE ${Number.isFinite(this.poseAge) ? Math.round(this.poseAge) + " ms" : "—"}\nRENDER VISIBLE ${this.group.visible ? "YES" : "NO"} | points ${this.jointGeometry.drawRange.count} / lines ${this.lineGeometry.drawRange.count / 2}\nHIDDEN REASON ${this.hiddenReason || "NO VALID POSE"} | ORIGIN ${this.origin || "NONE"}\n3D AVATAR ${this.config?.avatar ? "ON" : "OFF"} | ${this.config?.avatarSize || 100}% / ${this.config?.avatarStyle || "SKELETON"}\nAVATAR display scale ${(this.displayScale || 1).toFixed(2)} (visual only)\nAVATAR LEFT wrist (${f(this.wrist("left"))})\nAVATAR RIGHT wrist (${f(this.wrist("right"))})\nShared coordinates (origin reported above). Wrist anchors = accepted HandWind positions at every display size.`;
   }
   dispose() {
     if (this.disposed) return;

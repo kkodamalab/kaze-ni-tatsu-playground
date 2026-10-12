@@ -28,6 +28,8 @@ export class WindEngine {
           this.positions[i++] = (y / (c.gridY - 1) - 0.5) * SPACE_SIZE * 0.9;
           this.positions[i++] = (z / (c.gridZ - 1) - 0.5) * SPACE_SIZE * 0.9;
         }
+    this.generations = new Uint32Array(this.count);
+    this.recycleVersion = 0;
     this.time = 0;
     this.motionWindow = [];
     this.motion = {
@@ -82,6 +84,7 @@ export class WindEngine {
     this.left.update(dt, c);
     this.right.update(dt, c);
     this.components = {
+      ambient: this.ambientAt(0, 0, 0),
       weather: w,
       body: [...b],
       left: [...this.left.velocity],
@@ -103,7 +106,14 @@ export class WindEngine {
       this.left.at(p[j], p[j + 1], p[j + 2], c, l);
       this.right.at(p[j], p[j + 1], p[j + 2], c, r);
       for (let k = 0; k < 3; k++)
-        target[k] = ((w[k] + b[k] + l[k] + r[k]) * c.speed) / 100;
+        target[k] =
+          ((this.ambientAt(p[j], p[j + 1], p[j + 2], k) +
+            w[k] +
+            b[k] +
+            l[k] +
+            r[k]) *
+            c.speed) /
+          100;
       const lp = this.left.position,
         rp = this.right.position;
       if (
@@ -133,16 +143,25 @@ export class WindEngine {
         for (let k = 0; k < 3; k++) v[j + k] *= this.maxSpeed / speed;
       sumSpeed += Math.min(speed, this.maxSpeed);
       sumWind += Math.min(magnitude, this.maxSpeed);
-      let distance2 = 0;
+      let distance2 = 0,
+        crossed = 0;
       for (let k = 0; k < 3; k++) {
         const before = p[j + k];
         p[j + k] += v[j + k] * dt;
-        p[j + k] =
-          ((((p[j + k] + SPACE_SIZE / 2) % SPACE_SIZE) + SPACE_SIZE) %
-            SPACE_SIZE) -
-          SPACE_SIZE / 2;
-        const delta = Math.abs(p[j + k] - before);
-        distance2 += Math.min(delta, SPACE_SIZE - delta) ** 2;
+        distance2 += (p[j + k] - before) ** 2;
+        if (p[j + k] < -SPACE_SIZE / 2 || p[j + k] >= SPACE_SIZE / 2)
+          crossed |= 1 << k;
+      }
+      if (crossed) {
+        for (let k = 0; k < 3; k++)
+          p[j + k] =
+            crossed & (1 << k)
+              ? ((((p[j + k] + SPACE_SIZE / 2) % SPACE_SIZE) + SPACE_SIZE) %
+                  SPACE_SIZE) -
+                SPACE_SIZE / 2
+              : (Math.random() - 0.5) * SPACE_SIZE;
+        this.generations[j / 3]++;
+        this.recycleVersion++;
       }
       sumDistance += Math.sqrt(distance2);
     }
@@ -166,6 +185,26 @@ export class WindEngine {
       rightCount,
       appliedWindMagnitude: sumWind / this.count,
     };
+  }
+  ambientAt(x, y, z, axis) {
+    const c = this.config,
+      a = c.ambient ? (0.7 * c.ambientSpeed) / 100 : 0;
+    if (axis === undefined)
+      return [
+        this.ambientAt(x, y, z, 0),
+        this.ambientAt(x, y, z, 1),
+        this.ambientAt(x, y, z, 2),
+      ];
+    if (!a) return 0;
+    if (axis === 1)
+      return c.verticalFlow === "DOWN" ? -a : c.verticalFlow === "UP" ? a : 0;
+    return (
+      ((a * c.drift) / 100) *
+      0.5 *
+      (axis === 0
+        ? Math.sin(this.time * 0.45 + z * 0.23 + y * 0.17)
+        : Math.cos(this.time * 0.37 + x * 0.19 - y * 0.11))
+    );
   }
   dispose() {
     this.weather.dispose();

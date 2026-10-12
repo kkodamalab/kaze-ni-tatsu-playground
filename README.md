@@ -45,3 +45,11 @@ HAND FIELD DEBUG、異常時の診断と後始末、両ゲームと PHOTO GIFT �
 
 GitHub Pages は `main` のリポジトリルートから公開します。
 `dist/` のコミットは不要です。main へのプッシュで Pages の再デプロイが始まります。
+
+## Continuous flow / camera Pose
+
+統合版の3D WIND LABには、常時の下向き背景流、微弱な横揺らぎ、ランダム再投入、循環時の粒子別トレイル消去を追加しました。PARTICLE FLOWでON/OFF・速度・揺らぎ・上下方向を調整できます。純粋な身体／左右手の診断プリセットでは背景流がOFFになります。
+
+DIRECT HAND TESTでは左右の手を選び、3D画面をドラッグして、PC TESTやカメラと共通のHandWindを検証できます。カメラ座標変換は上半身＝肩中心、安定した全身＝腰中心とし、World座標が不完全ならフレーム全体をNormalizedへ戻します。単独版のリポジトリは変更していません。
+
+ゲーム終了時には木の静止画と写真一覧を残してカメラ・Worker・WebGLを解放し、再プレイで描画を再作成します。原因、追加設定、定量比較、実カメラ未検証の範囲は[検証報告](docs/continuous-flow-camera-validation.md)を参照してください。
