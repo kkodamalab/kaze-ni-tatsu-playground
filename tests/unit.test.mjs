@@ -334,3 +334,17 @@ test("confident torso still drives BODY WIND when ankles are cropped and avatar 
     assert.ok(Math.abs(e.velocities[i] - e.velocities[0]) < 1e-6);
   e.dispose();
 });
+
+test("World torso with finite but collapsed shoulder/hip geometry is rejected as a whole frame", () => {
+  const m = new CoordinateMapper(),
+    p = poseSequence("A", 0);
+  let frame;
+  for (let i = 0; i < 12; i++)
+    frame = m.avatarPose(p.landmarks, p.worldLandmarks, i * 40);
+  assert.equal(frame.coordinateSource, "WORLD");
+  p.worldLandmarks[23].y = p.worldLandmarks[24].y =
+    p.worldLandmarks[11].y + 0.01;
+  frame = m.avatarPose(p.landmarks, p.worldLandmarks, 600);
+  assert.equal(frame.coordinateSource, "NORMALIZED");
+  assert.ok(frame.bodyAxis.every(Number.isFinite));
+});
