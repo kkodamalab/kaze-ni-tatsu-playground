@@ -1,0 +1,333 @@
+#windLab {
+  position: fixed;
+  inset: 0;
+  overflow: auto;
+  z-index: 100;
+  color: #deedf5;
+  background: #08121d;
+  font:
+    14px/1.5 system-ui,
+    sans-serif;
+}
+#windLab * {
+  box-sizing: border-box;
+}
+#windLab button,
+#windLab input,
+#windLab select {
+  font: inherit;
+}
+#windLab button {
+  border: 1px solid #39637b;
+  border-radius: 7px;
+  background: #143148;
+  color: #e1f5ff;
+  padding: 8px 12px;
+  cursor: pointer;
+  margin: 3px;
+  min-height: 40px;
+}
+#windLab button:disabled {
+  opacity: 0.5;
+}
+#windLab button[aria-pressed="true"] {
+  background: #236864;
+}
+#windLab :focus-visible {
+  outline: 3px solid #7ae4df;
+  outline-offset: 2px;
+}
+.lab-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid #284152;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.lab-header h1 {
+  font-size: 22px;
+  margin: 0;
+}
+.lab-header p {
+  margin: 0;
+}
+.lab-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  min-height: calc(100vh - 130px);
+}
+.lab-stage {
+  position: sticky;
+  top: 0;
+  height: calc(100vh - 140px);
+  min-height: 340px;
+  overflow: hidden;
+  background: #07111c;
+  touch-action: none;
+}
+.lab-stage > canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.lab-caption {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  pointer-events: none;
+  color: #9ab5ca;
+  font-size: 12px;
+}
+.lab-preview {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  width: 180px;
+  height: 135px;
+  overflow: hidden;
+  border: 1px solid #54718b;
+  border-radius: 8px;
+  background: #102235;
+}
+.lab-preview.hidden {
+  display: none;
+}
+.lab-preview #camera {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform: scaleX(-1);
+  opacity: 1;
+  z-index: 0;
+}
+.lab-preview canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+.lab-settings {
+  padding: 12px;
+  overflow: visible;
+}
+.lab-settings fieldset {
+  margin: 0 0 12px;
+  border: 1px solid #2c4b60;
+  border-radius: 8px;
+  padding: 12px;
+}
+.lab-settings legend {
+  color: #81dce0;
+  font-weight: 650;
+}
+.lab-settings label {
+  display: block;
+  margin: 6px 0;
+}
+.lab-settings label input[type="range"] {
+  display: block;
+  width: 100%;
+  accent-color: #73d6d0;
+}
+.lab-settings input[type="number"] {
+  width: 110px;
+  background: #132c40;
+  color: white;
+  border: 1px solid #567186;
+  padding: 6px;
+}
+.lab-settings output {
+  float: right;
+  color: #8fe2e4;
+}
+.lab-settings pre {
+  white-space: pre-wrap;
+  font-size: 11px;
+}
+.lab-settings p {
+  font-size: 12px;
+  color: #b5cad5;
+}
+.lab-weather {
+  max-width: 690px;
+}
+.lab-weather small {
+  display: block;
+}
+.lab-toast {
+  padding: 6px 20px;
+  color: #ffcf8d;
+  min-height: 30px;
+}
+.lab-status {
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 760px) {
+  .lab-layout {
+    grid-template-columns: 1fr;
+  }
+  .lab-stage {
+    position: relative;
+    height: 50vh;
+    min-height: 300px;
+  }
+  .lab-settings {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .lab-settings fieldset {
+    min-width: 0;
+    margin: 0;
+  }
+  .lab-header {
+    padding: 10px;
+    gap: 8px;
+  }
+  .lab-preview {
+    width: 120px;
+    height: 90px;
+  }
+  .lab-settings button {
+    font-size: 12px;
+    padding: 8px;
+  }
+  .lab-settings label {
+    font-size: 12px;
+  }
+}
+@media (max-width: 420px) {
+  .lab-settings {
+    grid-template-columns: 1fr;
+  }
+  .lab-stage {
+    height: 45vh;
+  }
+  .lab-header h1 {
+    font-size: 19px;
+  }
+}
+/* Display adapters keep the same engine and camera. */
+.lab-stage {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+.lab-details,
+.lab-play {
+  grid-column: 2;
+  min-width: 0;
+}
+.lab-details {
+  align-self: start;
+}
+.lab-details summary {
+  cursor: pointer;
+  padding: 12px;
+}
+.lab-play {
+  padding: 16px;
+}
+.lab-play label {
+  display: block;
+  margin: 10px 0;
+}
+.lab-play input[type="range"] {
+  display: block;
+  width: 100%;
+}
+.lab-play input[type="number"] {
+  width: 75px;
+}
+.lab-play p {
+  font-size: 13px;
+}
+.lab-growth-hud {
+  position: absolute;
+  left: 15px;
+  top: 15px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #07111caa;
+  color: white;
+  pointer-events: none;
+  max-width: 50%;
+}
+.lab-growth-hud strong {
+  font-size: 30px;
+}
+.lab-growth-hud progress,
+.lab-growth-hud span:last-child {
+  display: block;
+  width: 100%;
+}
+#windLab [hidden] {
+  display: none !important;
+}
+#windLab[data-display-mode="KIDS"] {
+  background: #e9f5dd;
+  color: #39533b;
+}
+#windLab[data-display-mode="KIDS"] button {
+  background: #f5df9d;
+  color: #423924;
+  border-color: #b79a58;
+}
+#windLab[data-display-mode="KIDS"] .lab-caption {
+  display: none;
+}
+#windLab[data-display-mode="ART"] .lab-header {
+  background: #030818;
+}
+#windLab[data-display-mode="ART"] .lab-caption {
+  display: none;
+}
+#lab-photoDialog {
+  max-width: min(90vw, 760px);
+}
+#lab-photoPreview {
+  max-width: 100%;
+  max-height: 65vh;
+}
+@media (max-width: 760px) {
+  .lab-layout {
+    display: flex;
+    flex-direction: column;
+  }
+  .lab-stage {
+    position: relative;
+    height: 55vh;
+    min-height: 320px;
+  }
+  .lab-play,
+  .lab-details {
+    width: 100%;
+  }
+  .lab-growth-hud {
+    max-width: 45%;
+    font-size: 12px;
+  }
+}
+
+.lab-avatar-status {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  max-width: calc(100% - 16px);
+  max-height: 45%;
+  overflow: auto;
+  z-index: 4;
+  margin: 0;
+  padding: 8px;
+  font-size: 11px;
+  white-space: pre-wrap;
+  color: #fff;
+  background: #102638e6;
+  pointer-events: none;
+}
+.lab-avatar-status[hidden] {
+  display: none;
+}
