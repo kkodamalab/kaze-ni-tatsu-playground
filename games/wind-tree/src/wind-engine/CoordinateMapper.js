@@ -55,6 +55,9 @@ export class CoordinateMapper {
     const indices = Array.from({ length: 33 }, (_, i) => i).filter(
       (i) => (trackingMode === "FULL BODY" || i < 23) && visible(lm[i]),
     );
+    const usedIndices = [
+      ...new Set([...indices, ...[23, 24].filter((i) => visible(lm[i]))]),
+    ];
     const finiteWorld = (p) =>
       validLandmark(p) &&
       Number.isFinite(p.z) &&
@@ -68,6 +71,8 @@ export class CoordinateMapper {
         [13, 15],
         [12, 14],
         [14, 16],
+        [11, 23],
+        [12, 24],
         [0, 11],
         [0, 12],
         [23, 25],
@@ -75,7 +80,7 @@ export class CoordinateMapper {
         [24, 26],
         [26, 28],
       ].every(([a, b]) => {
-        if (!indices.includes(a) || !indices.includes(b)) return true;
+        if (!usedIndices.includes(a) || !usedIndices.includes(b)) return true;
         if (!finiteWorld(worldLandmarks[a]) || !finiteWorld(worldLandmarks[b]))
           return false;
         const ratio = (p) =>
@@ -90,7 +95,7 @@ export class CoordinateMapper {
     const worldUsable =
       comparable &&
       worldLandmarks?.length >= 33 &&
-      indices.every((i) => finiteWorld(worldLandmarks[i])) &&
+      usedIndices.every((i) => finiteWorld(worldLandmarks[i])) &&
       span(worldLandmarks) > 0.08 &&
       Math.sign(worldLandmarks[11].x - worldLandmarks[12].x) ===
         Math.sign(lm[11].x - lm[12].x);
@@ -165,7 +170,7 @@ export class CoordinateMapper {
       return null;
     });
     let bodyAxis = null;
-    if (trackingMode === "FULL BODY") {
+    if ([23, 24].every((i) => visible(lm[i]) && validLandmark(input[i]))) {
       const shoulder = ["x", "y", "z"].map(
         (k) => ((input[11][k] || 0) + (input[12][k] || 0)) / 2,
       );

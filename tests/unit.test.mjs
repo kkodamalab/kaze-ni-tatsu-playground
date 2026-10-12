@@ -313,3 +313,38 @@ test("upper-body Pose detection is independent of missing body-axis wind input",
   a.dispose();
   e.dispose();
 });
+
+test("confident torso still drives BODY WIND when ankles are cropped and avatar is upper-body", () => {
+  const m = new CoordinateMapper(),
+    data = upper(),
+    full = poseSequence("A", 0);
+  data.landmarks[23] = full.landmarks[23];
+  data.landmarks[24] = full.landmarks[24];
+  data.landmarks[11].x -= 0.05;
+  data.landmarks[12].x -= 0.05;
+  const frame = m.avatarPose(data.landmarks, null, 0),
+    sample = m.fromPose(data.landmarks, null, frame);
+  assert.equal(frame.trackingMode, "UPPER BODY");
+  assert.equal(frame.points[23], null);
+  assert.ok(sample.body[0] > 0.1);
+  const e = new WindEngine({ ...isolated, body: true });
+  tick(e, 1, () => sample);
+  assert.ok(e.motion.meanSpeed > 0.5);
+  for (let i = 3; i < e.velocities.length; i += 3)
+    assert.ok(Math.abs(e.velocities[i] - e.velocities[0]) < 1e-6);
+  e.dispose();
+});
+
+test("World torso with finite but collapsed shoulder/hip geometry is rejected as a whole frame", () => {
+  const m = new CoordinateMapper(),
+    p = poseSequence("A", 0);
+  let frame;
+  for (let i = 0; i < 12; i++)
+    frame = m.avatarPose(p.landmarks, p.worldLandmarks, i * 40);
+  assert.equal(frame.coordinateSource, "WORLD");
+  p.worldLandmarks[23].y = p.worldLandmarks[24].y =
+    p.worldLandmarks[11].y + 0.01;
+  frame = m.avatarPose(p.landmarks, p.worldLandmarks, 600);
+  assert.equal(frame.coordinateSource, "NORMALIZED");
+  assert.ok(frame.bodyAxis.every(Number.isFinite));
+});
