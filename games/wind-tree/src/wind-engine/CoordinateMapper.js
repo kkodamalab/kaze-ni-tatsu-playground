@@ -16,8 +16,11 @@ export function validLandmark(p) {
 export class CoordinateMapper {
   constructor(size = SPACE_SIZE) {
     this.size = size;
+    this.cameraAspect = 1;
+    this.avatarSize = 100;
   }
   resetAvatar() {
+    this.cameraAspect = 1;
     this.avatarReference = null;
     this.avatarOrigin = null;
     this.worldFrames = 0;
@@ -32,12 +35,16 @@ export class CoordinateMapper {
     return [
       (0.5 - p.x) * this.size,
       (0.5 - p.y) * this.size,
-      clamp(Number.isFinite(p.z) ? p.z : 0, -0.5, 0.5) * this.size,
+      clamp(Number.isFinite(p.z) ? -p.z : 0, -0.5, 0.5) * this.size,
     ];
   }
   // Select one input coordinate system for the whole frame, then one similarity transform.
   avatarPose(landmarks, worldLandmarks, time = performance.now()) {
     const lm = landmarks || [];
+    const aspect =
+      Number.isFinite(this.cameraAspect) && this.cameraAspect > 0
+        ? this.cameraAspect
+        : 1;
     const visible = (p) =>
       validLandmark(p) &&
       p.x >= -0.15 &&
@@ -63,7 +70,10 @@ export class CoordinateMapper {
       Number.isFinite(p.z) &&
       Math.max(Math.abs(p.x), Math.abs(p.y), Math.abs(p.z)) < 3;
     const span = (input) =>
-      Math.hypot(input[11].x - input[12].x, input[11].y - input[12].y);
+      Math.hypot(
+        (input[11].x - input[12].x) * (input === lm ? aspect : 1),
+        input[11].y - input[12].y,
+      );
     const comparable =
       worldLandmarks?.length >= 33 &&
       [
@@ -84,8 +94,10 @@ export class CoordinateMapper {
         if (!finiteWorld(worldLandmarks[a]) || !finiteWorld(worldLandmarks[b]))
           return false;
         const ratio = (p) =>
-          Math.hypot(p[a].x - p[b].x, p[a].y - p[b].y) /
-          Math.max(0.001, span(p));
+          Math.hypot(
+            (p[a].x - p[b].x) * (p === lm ? aspect : 1),
+            p[a].y - p[b].y,
+          ) / Math.max(0.001, span(p));
         const expected = ratio(lm),
           actual = ratio(worldLandmarks);
         return (
@@ -108,6 +120,8 @@ export class CoordinateMapper {
         (this.worldFrames >= 5 && time >= (this.worldHoldUntil || 0)));
     const input = world ? worldLandmarks : lm;
     const source = world ? "POSE WORLD" : "POSE NORMALIZED";
+    const xScale = world ? 1 : aspect;
+    const projectionKey = source + (world ? "" : "/" + aspect);
     const root = trackingMode === "FULL BODY" ? [23, 24] : [11, 12];
     const center = ["x", "y", "z"].map(
       (k) => ((input[root[0]][k] || 0) + (input[root[1]][k] || 0)) / 2,
@@ -115,10 +129,13 @@ export class CoordinateMapper {
     const raw = Array.from({ length: 33 }, (_, i) =>
       indices.includes(i)
         ? [
-            center[0] - input[i].x,
+            (center[0] - input[i].x) * xScale,
             center[1] - input[i].y,
-            clamp((input[i].z || 0) - center[2], -span(input), span(input)) *
-              0.45,
+            clamp(
+              (center[2] - (input[i].z || 0)) * xScale,
+              -span(input),
+              span(input),
+            ) * 0.45,
           ]
         : null,
     );
@@ -128,14 +145,19 @@ export class CoordinateMapper {
     );
     const desired = Math.min(
       4 / Math.max(0.05, span(input)),
+      (this.size * 0.15) / extent,
+    );
+    const referenceKey = projectionKey + "/" + trackingMode;
+    if (this.avatarReference?.key !== referenceKey)
+      this.avatarReference = { key: referenceKey, scale: desired };
+    // A single uniform fit preserves arm proportions; no individual coordinate clipping.
+    const scale = Math.min(
+      (this.avatarReference.scale * (this.avatarSize || 100)) / 100,
       (this.size * 0.44) / extent,
     );
-    if (this.avatarReference?.source !== source)
-      this.avatarReference = { source, scale: desired };
-    // A single uniform fit preserves arm proportions; no individual coordinate clipping.
-    const scale = Math.min(this.avatarReference.scale, desired);
+    const handVelocityScale = scale / this.avatarReference.scale;
     let points = raw.map((p) => (p ? p.map((v) => v * scale) : null));
-    const key = source + "/" + trackingMode;
+    const key = referenceKey + "/" + (this.avatarSize || 100);
     if (this.frameKey && this.frameKey !== key)
       this.transition = { start: time, points: this.lastPose.points };
     const progress = this.transition
@@ -179,13 +201,15 @@ export class CoordinateMapper {
       );
       const height = Math.max(0.05, hip[1] - shoulder[1]);
       bodyAxis = [
-        clamp((hip[0] - shoulder[0]) / height, -1, 1),
+        clamp(((hip[0] - shoulder[0]) * xScale) / height, -1, 1),
         0,
-        clamp(((shoulder[2] - hip[2]) * 0.45) / height, -1, 1),
+        clamp(((hip[2] - shoulder[2]) * xScale * 0.45) / height, -1, 1),
       ];
     }
     const frame = {
       points,
+      coherentPose: true,
+      handVelocityScale,
       bodyAxis,
       source,
       coordinateSource: world ? "WORLD" : "NORMALIZED",
@@ -258,6 +282,8 @@ export class CoordinateMapper {
     if (frame?.bodyAxis)
       return {
         detected: true,
+        rebase: frame.transitioning,
+        handVelocityScale: frame.handVelocityScale,
         body: frame.bodyAxis,
         left: frame.windHands.left,
         right: frame.windHands.right,
@@ -280,6 +306,8 @@ export class CoordinateMapper {
     return {
       detected: !!frame && frame.validCount > 0,
       body,
+      rebase: !!frame?.transitioning,
+      handVelocityScale: frame?.handVelocityScale || 1,
       left: frame?.windHands.left || null,
       right: frame?.windHands.right || null,
     };

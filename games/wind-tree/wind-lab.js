@@ -200,7 +200,7 @@ export class WindLab {
       Object.entries(groups)
         .map(
           ([name, fields]) =>
-            `<fieldset><legend>${name}</legend>${name === "WEATHER" ? `<p>位置情報をOpen-Meteoへ送信して、周辺の大まかな風を表示します。正確な位置は保存しません。</p><button id="labGps">現在地の風を取得 / GPS WEATHER</button><p>MANUAL LOCATION：デモ地点は南大沢周辺（現在地ではありません）。座標は保存しません。</p><label>緯度 <input id="labLatitude" type="number" min="-90" max="90" step="any" value="35.61"></label><label>経度 <input id="labLongitude" type="number" min="-180" max="180" step="any" value="139.38"></label><button id="labManual">手動地点の風を取得</button><button id="labSimulated">SIMULATED WIND</button><p><a href="https://open-meteo.com/" target="_blank" rel="noopener">Weather data by Open-Meteo</a>（予測値）</p>` : ""}${fields.map(([key, label]) => (typeof c[key] === "boolean" ? `<label><input id="lab-${key}" data-key="${key}" type="checkbox" ${c[key] ? "checked" : ""}> ${label}</label>` : `<label for="lab-${key}">${label}<output id="lab-value-${key}">${c[key]}</output><input id="lab-${key}" data-key="${key}" type="range" min="${RANGES[key][0]}" max="${RANGES[key][1]}" step="${RANGES[key][2]}" value="${c[key]}"></label>`)).join("")}${name === "AVATAR" ? `<label><input id="lab-avatar-axes" data-key="axes" type="checkbox" ${c.axes ? "checked" : ""}> XYZ AXIS</label><label for="lab-avatarStyle">AVATAR STYLE<select id="lab-avatarStyle" data-key="avatarStyle"><option value="SKELETON" ${c.avatarStyle === "SKELETON" ? "selected" : ""}>SKELETON</option><option value="POINTS" ${c.avatarStyle === "POINTS" ? "selected" : ""}>POINTS</option></select></label><p>腰中心の表示用骨格。推定奥行きは目安です。手首は風の中心に固定。サイズは胴体などの表示倍率を変え、風の位置・半径は変更しません。</p>` : ""}${name === "PARTICLE FLOW" ? `<label>VERTICAL FLOW<select id="lab-verticalFlow" data-key="verticalFlow"><option>DOWN</option><option>UP</option><option>NONE</option></select></label>` : ""}${name === "PARTICLES" ? '<button id="labResetParticles">PARTICLE RESET</button><button id="labResetView">CAMERA VIEW RESET</button>' : ""}${name === "BODY" ? '<button id="labCalibrate">CALIBRATE</button><p>現在の姿勢をニュートラルにします。奥行きは単眼推定の目安です。</p>' : ""}</fieldset>`,
+            `<fieldset><legend>${name}</legend>${name === "WEATHER" ? `<p>位置情報をOpen-Meteoへ送信して、周辺の大まかな風を表示します。正確な位置は保存しません。</p><button id="labGps">現在地の風を取得 / GPS WEATHER</button><p>MANUAL LOCATION：デモ地点は南大沢周辺（現在地ではありません）。座標は保存しません。</p><label>緯度 <input id="labLatitude" type="number" min="-90" max="90" step="any" value="35.61"></label><label>経度 <input id="labLongitude" type="number" min="-180" max="180" step="any" value="139.38"></label><button id="labManual">手動地点の風を取得</button><button id="labSimulated">SIMULATED WIND</button><p><a href="https://open-meteo.com/" target="_blank" rel="noopener">Weather data by Open-Meteo</a>（予測値）</p>` : ""}${fields.map(([key, label]) => (typeof c[key] === "boolean" ? `<label><input id="lab-${key}" data-key="${key}" type="checkbox" ${c[key] ? "checked" : ""}> ${label}</label>` : `<label for="lab-${key}">${label}<output id="lab-value-${key}">${c[key]}</output><input id="lab-${key}" data-key="${key}" type="range" min="${RANGES[key][0]}" max="${RANGES[key][1]}" step="${RANGES[key][2]}" value="${c[key]}"></label>`)).join("")}${name === "AVATAR" ? `<label><input id="lab-avatar-axes" data-key="axes" type="checkbox" ${c.axes ? "checked" : ""}> XYZ AXIS</label><label for="lab-avatarStyle">AVATAR STYLE<select id="lab-avatarStyle" data-key="avatarStyle"><option value="SKELETON" ${c.avatarStyle === "SKELETON" ? "selected" : ""}>SKELETON</option><option value="POINTS" ${c.avatarStyle === "POINTS" ? "selected" : ""}>POINTS</option></select></label><p>上半身は肩中心、全身は腰中心。推定奥行きは目安です。Poseの倍率は全関節と手の風の位置に共通適用します。速度ゲインと風の半径は変えません。</p>` : ""}${name === "PARTICLE FLOW" ? `<label>VERTICAL FLOW<select id="lab-verticalFlow" data-key="verticalFlow"><option>DOWN</option><option>UP</option><option>NONE</option></select></label>` : ""}${name === "PARTICLES" ? '<button id="labResetParticles">PARTICLE RESET</button><button id="labResetView">CAMERA VIEW RESET</button>' : ""}${name === "BODY" ? '<button id="labCalibrate">CALIBRATE</button><p>現在の姿勢をニュートラルにします。奥行きは単眼推定の目安です。</p>' : ""}</fieldset>`,
         )
         .join("");
     this.root.innerHTML = `<header class="lab-header"><h1>3D WIND LAB</h1><nav aria-label="DISPLAY MODE">${["DOT", "KIDS", "ART"].map((mode) => `<button data-mode="${mode}" aria-pressed="${mode === "DOT"}">${mode}</button>`).join("")}</nav><div class="lab-weather"><p id="labWeatherStatus" class="lab-status" role="status"></p><small id="labWeatherDetails"></small></div><div><button id="labCamera" aria-pressed="false">CAMERA OFF</button><button id="labSkeleton" aria-pressed="false">SKELETON OFF</button><button id="labPc" aria-pressed="true">PC TEST ON</button><button id="labExit">ゲームに戻る</button></div></header><div id="labMessage" class="lab-toast" role="status"></div><div class="lab-layout"><div class="lab-stage"><div class="lab-preview hidden"><canvas id="labSkeletonCanvas"></canvas></div><pre id="labAvatarStatus" class="lab-avatar-status" role="status" hidden></pre><div class="lab-caption">ドラッグ / タッチで回転・ピンチでズーム<br>+X 東（右） / +Y 上 / -Z 北（奥）<br>マゼンタ = 左手 / アンバー = 右手</div></div><aside class="lab-settings">${settings}<fieldset><legend>DIRECT HAND TEST</legend><button id="labDirect" aria-pressed="false">DIRECT HAND TEST OFF</button><label>操作する手<select id="labDirectSide"><option value="left">LEFT / マゼンタ</option><option value="right">RIGHT / アンバー</option></select></label><p>3D画面をドラッグして手の球を動かします。PC・Poseと同じHandWindを使用します。</p></fieldset><fieldset id="labPcPanel"><legend>PC TEST</legend><label>合成33点Pose<select id="labPoseTest"><option value="">MANUAL / AUTO MOTION</option>${Object.entries(
@@ -513,6 +513,7 @@ export class WindLab {
     const dt = this.last ? Math.min((t - this.last) / 1000, 0.1) : 0;
     this.last = t;
     this.diagnostics.renderFrames++;
+    this.mapper.avatarSize = this.engine.config.avatarSize;
     if (this.direct) {
       this.acceptInput({ body: [0, 0, 0], ...this.directHands }, t, "direct");
     } else if (this.pc) {
@@ -560,20 +561,25 @@ export class WindLab {
             const lm = recent ? result?.landmarks?.[0] : null;
             this.diagnostics.poseFrames++;
             this.diagnostics.landmarkCount = lm?.length || 0;
+            this.mapper.cameraAspect =
+              (result?.imageWidth || this.video.videoWidth || 360) /
+              (result?.imageHeight || this.video.videoHeight || 270);
             const poseFrame = this.mapper.avatarPose(
               lm,
               result?.worldLandmarks?.[0],
               result?.timestamp ?? t,
             );
-            if (poseFrame?.transitioning) {
-              this.engine.left.previous = this.engine.right.previous = null;
-            }
             this.acceptInput(
               this.mapper.fromPose(lm, result?.worldLandmarks?.[0], poseFrame),
               t,
               "pose",
             );
-            this.avatar.input(poseFrame, t);
+            this.avatar.input(
+              poseFrame
+                ? { ...poseFrame, timestamp: result?.timestamp ?? t }
+                : null,
+              t,
+            );
             this.lastDetection = lm ? t : 0;
             this.skeletonDraw(lm);
           }

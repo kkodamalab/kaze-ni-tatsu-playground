@@ -44,6 +44,8 @@ export class PosePipeline {
         if (data.generation === this.generation)
           this.result = {
             ...data.result,
+            imageWidth: data.imageWidth,
+            imageHeight: data.imageHeight,
             timestamp: data.timestamp,
             inferenceMs: data.inferenceMs,
           };

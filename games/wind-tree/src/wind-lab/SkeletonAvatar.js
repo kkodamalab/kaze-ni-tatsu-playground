@@ -83,6 +83,9 @@ export class SkeletonAvatar {
       }
     });
     this.lastInput = now;
+    this.captureTime = Number.isFinite(frame.timestamp) ? frame.timestamp : now;
+    this.coherentPose = !!frame.coherentPose;
+    this.poseTransformScale = frame.handVelocityScale || 1;
     this.source = frame.source;
     this.origin = frame.origin || "SYNTHETIC";
     this.trackingMode = frame.trackingMode || "SYNTHETIC";
@@ -91,6 +94,8 @@ export class SkeletonAvatar {
   }
   resetTracking() {
     this.lastInput = null;
+    this.captureTime = null;
+    this.poseAge = Infinity;
     this.valid.fill(0);
     this.group.visible = false;
     this.source = "NONE";
@@ -104,7 +109,8 @@ export class SkeletonAvatar {
     this.config = config;
     const age =
       this.lastInput === null ? Infinity : Math.max(0, now - this.lastInput);
-    this.poseAge = age;
+    this.poseAge =
+      this.captureTime == null ? Infinity : Math.max(0, now - this.captureTime);
     this.opacity = Math.max(0, Math.min(1, 1 - (age - 250) / 500));
     this.state = age <= 250 ? "DETECTED" : age < 750 ? "HOLD / FADE" : "LOST";
     this.group.visible =
@@ -134,7 +140,7 @@ export class SkeletonAvatar {
           extent = Math.max(extent, Math.abs(this.current[i * 3 + k]));
     // Large synthetic gestures also stay inside the cube, using one uniform visual fit.
     this.displayScale = Math.min(
-      config.avatarSize / 100,
+      this.coherentPose ? 1 : config.avatarSize / 100,
       (SPACE_SIZE * 0.49) / extent,
     );
     let count = 0;
@@ -206,7 +212,7 @@ export class SkeletonAvatar {
   }
   text() {
     const f = (v) => (v ? v.map((n) => n.toFixed(2)).join(", ") : "—");
-    return `POSE SOURCE ${this.source} | POSE AGE ${Number.isFinite(this.poseAge) ? Math.round(this.poseAge) : "—"} ms\nCOORDINATE SOURCE ${this.coordinateSource || "NONE"}\nTRACKING MODE ${this.trackingMode || "LOST"}\nAVATAR INPUT ${this.source} | ${this.state || "LOST"}\nVALID LANDMARKS ${this.validCount || 0}/33 (held ${this.heldCount || 0})\nLAST POSE AGE ${Number.isFinite(this.poseAge) ? Math.round(this.poseAge) + " ms" : "—"}\nRENDER VISIBLE ${this.group.visible ? "YES" : "NO"} | points ${this.jointGeometry.drawRange.count} / lines ${this.lineGeometry.drawRange.count / 2}\nHIDDEN REASON ${this.hiddenReason || "NO VALID POSE"} | ORIGIN ${this.origin || "NONE"}\n3D AVATAR ${this.config?.avatar ? "ON" : "OFF"} | ${this.config?.avatarSize || 100}% / ${this.config?.avatarStyle || "SKELETON"}\nAVATAR display scale ${(this.displayScale || 1).toFixed(2)} (visual only)\nAVATAR LEFT wrist (${f(this.wrist("left"))})\nAVATAR RIGHT wrist (${f(this.wrist("right"))})\nShared coordinates (origin reported above). Wrist anchors = accepted HandWind positions at every display size.`;
+    return `POSE SOURCE ${this.source} | POSE AGE ${Number.isFinite(this.poseAge) ? Math.round(this.poseAge) : "—"} ms\nCOORDINATE SOURCE ${this.coordinateSource || "NONE"}\nTRACKING MODE ${this.trackingMode || "LOST"}\nAVATAR INPUT ${this.source} | ${this.state || "LOST"}\nVALID LANDMARKS ${this.validCount || 0}/33 (held ${this.heldCount || 0})\nLAST POSE AGE ${Number.isFinite(this.poseAge) ? Math.round(this.poseAge) + " ms" : "—"}\nRENDER VISIBLE ${this.group.visible ? "YES" : "NO"} | points ${this.jointGeometry.drawRange.count} / lines ${this.lineGeometry.drawRange.count / 2}\nHIDDEN REASON ${this.hiddenReason || "NO VALID POSE"} | ORIGIN ${this.origin || "NONE"}\n3D AVATAR ${this.config?.avatar ? "ON" : "OFF"} | ${this.config?.avatarSize || 100}% / ${this.config?.avatarStyle || "SKELETON"}\nPOSE TRANSFORM SCALE ${(this.poseTransformScale || 1).toFixed(2)}\nAVATAR rendered scale ${(this.displayScale || 1).toFixed(2)} (visual only)\nAVATAR LEFT wrist (${f(this.wrist("left"))})\nAVATAR RIGHT wrist (${f(this.wrist("right"))})\nShared coordinates (origin reported above). Wrist anchors = accepted HandWind positions at every display size.`;
   }
   dispose() {
     if (this.disposed) return;

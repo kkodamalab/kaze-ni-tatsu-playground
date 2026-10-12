@@ -348,3 +348,116 @@ test("World torso with finite but collapsed shoulder/hip geometry is rejected as
   assert.equal(frame.coordinateSource, "NORMALIZED");
   assert.ok(frame.bodyAxis.every(Number.isFinite));
 });
+
+test("normalized upper-body aspect mapping preserves camera-pixel arm ratios for wide and portrait video", () => {
+  const data = upper();
+  for (const aspect of [2, 4 / 3, 0.5, 0.75]) {
+    const m = new CoordinateMapper();
+    m.cameraAspect = aspect;
+    const frame = m.avatarPose(data.landmarks, null, 0);
+    const pixel = (i) => [data.landmarks[i].x * aspect, data.landmarks[i].y, 0];
+    const expected =
+      length(pixel(11), pixel(13)) / length(pixel(13), pixel(15));
+    const actual =
+      length(frame.points[11], frame.points[13]) /
+      length(frame.points[13], frame.points[15]);
+    assert.ok(Math.abs(actual - expected) < 1e-8);
+    assert.ok(
+      Math.abs(
+        (frame.points[11][1] - frame.points[15][1]) /
+          (frame.points[11][0] - frame.points[15][0]) -
+          (data.landmarks[15].y - data.landmarks[11].y) /
+            ((data.landmarks[15].x - data.landmarks[11].x) * aspect),
+      ) < 1e-8,
+    );
+  }
+});
+
+test("MediaPipe negative depth maps toward front camera; torso forward wind has same sign", () => {
+  const m = new CoordinateMapper(),
+    data = poseSequence("A", 0);
+  m.cameraAspect = 4 / 3;
+  data.landmarks[15].z = -0.1;
+  data.landmarks[11].z = data.landmarks[12].z = -0.05;
+  const frame = m.avatarPose(data.landmarks, null, 0);
+  assert.ok(frame.points[15][2] > 0);
+  assert.ok(frame.bodyAxis[2] > 0);
+  assert.ok(m.point(data.landmarks[15])[2] > 0);
+});
+test("Pose avatar zoom uses one uniform transform, keeps arm ratios and field/wrist alignment at20/100/183/300", () => {
+  for (const size of [20, 100, 183, 300]) {
+    const m = new CoordinateMapper(),
+      data = upper();
+    m.cameraAspect = 4 / 3;
+    m.avatarSize = size;
+    const f = m.avatarPose(data.landmarks, null, 0),
+      e = new WindEngine({ ...isolated, avatar: true, avatarSize: size });
+    const a = new SkeletonAvatar(new THREE.Scene());
+    e.input(m.fromPose(data.landmarks, null, f), 1);
+    a.input(f, 0);
+    a.update(0, 0.016, e.config, e);
+    const input = (i) => [
+      (data.landmarks[i].x * 4) / 3,
+      data.landmarks[i].y,
+      0,
+    ];
+    const expected =
+      length(input(11), input(13)) / length(input(13), input(15));
+    const point = (i) => Array.from(a.rendered.slice(i * 3, i * 3 + 3));
+    assert.ok(
+      Math.abs(
+        length(point(11), point(13)) / length(point(13), point(15)) - expected,
+      ) < 1e-5,
+    );
+    assert.ok(
+      a.wrist("left").every((v, k) => Math.abs(v - e.left.position[k]) < 1e-5),
+    );
+    assert.ok(a.rendered.every((v) => Math.abs(v) < 10));
+    a.dispose();
+    e.dispose();
+  }
+});
+test("Pose display scale does not amplify hand-force gain; independent location still matches display", () => {
+  const winds = [];
+  for (const scale of [0.2, 1, 1.83, 3]) {
+    const e = new WindEngine({ ...isolated, left: true });
+    tick(e, 2, (t) => ({
+      left: [t * 0.4 * scale, 0, 0],
+      handVelocityScale: scale,
+    }));
+    winds.push(Math.hypot(...e.left.at(...e.left.position, e.config)));
+    assert.ok(
+      Math.abs(e.left.position[0] - ((0.4 * 119) / 60) * scale) < 0.1 * scale,
+    );
+    e.dispose();
+  }
+  for (const wind of winds) assert.ok(Math.abs(wind - winds[0]) < 1e-5);
+});
+test("POSE AGE reports capture age while existing hold/fade remains based on accepted results", () => {
+  const m = new CoordinateMapper(),
+    data = upper(),
+    frame = { ...m.avatarPose(data.landmarks, null, 1000), timestamp: 1000 };
+  const a = new SkeletonAvatar(new THREE.Scene()),
+    e = new WindEngine({ avatar: true });
+  a.input(frame, 1100);
+  a.update(1120, 0.016, e.config);
+  assert.equal(a.poseAge, 120);
+  assert.equal(a.state, "DETECTED");
+  a.update(1900, 0.016, e.config);
+  assert.equal(a.group.visible, false);
+  a.dispose();
+  e.dispose();
+});
+
+test("coordinate rebase contract seeds hand positions without a synthetic gust for every input source", () => {
+  const e = new WindEngine({ ...isolated, left: true });
+  e.input({ left: [0, 0, 0] }, 1);
+  e.input({ left: [0.3, 0, 0] }, 101);
+  e.step(0.1);
+  assert.ok(e.left.velocity[0] > 0);
+  e.input({ left: [5, 0, 0], rebase: true, handVelocityScale: 1.83 }, 151);
+  assert.deepEqual(e.left.position, [5, 0, 0]);
+  assert.deepEqual(e.left.target, [0, 0, 0]);
+  assert.deepEqual(e.left.velocity, [0, 0, 0]);
+  e.dispose();
+});

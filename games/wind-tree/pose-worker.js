@@ -32,6 +32,8 @@ self.onmessage = async ({ data }) => {
       self.postMessage({
         type: "result",
         result,
+        imageWidth: data.bitmap.width,
+        imageHeight: data.bitmap.height,
         timestamp: data.timestamp,
         generation: data.generation,
         inferenceMs: performance.now() - start,
