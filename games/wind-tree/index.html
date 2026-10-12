@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <title>風の木になろう！</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="wind-lab.css" />
+  </head>
+  <body>
+    <div id="app">
+      <video id="camera" playsinline muted></video><canvas id="world"></canvas>
+      <div id="hud">
+        <div class="brand">
+          風の木になろう！<small>Become a Wind Tree!</small>
+        </div>
+        <div id="timer">30</div>
+      </div>
+      <div id="photoStatus" role="status">撮影は同意確認後に有効になります</div>
+      <button id="stopPhotoBtn" class="hidden">撮影を止める</button>
+      <button id="skeletonToggle" aria-pressed="false">SKELETON OFF</button>
+      <section id="skeletonHud" class="hidden" aria-live="polite">
+        <b id="poseStatus">POSE: NOT DETECTED</b
+        ><span id="axisStatus">BODY AXIS: +0.0°</span
+        ><span id="leftStatus">LEFT HAND: 0.00</span
+        ><span id="rightStatus">RIGHT HAND: 0.00</span
+        ><span id="windStatus">WIND: 0.00</span
+        ><span id="treeStatus">TREE GROWTH: 0.00</span
+        ><span id="gainStatus"></span><span id="leafVelocityStatus"></span
+        ><span id="windVectorStatus"></span>
+      </section>
+      <section id="start" class="panel">
+        <p class="home-eyebrow">WIND · BODY · NATURE</p>
+        <h1>風の木になろう</h1>
+        <p class="home-description">
+          からだをゆらして、手で風をつくる。<br />あなたの動きで、葉が舞い、木が育ちます。
+        </p>
+        <div class="home-duration">
+          <label for="durationRange">プレイ時間</label>
+          <div class="durationInputs">
+            <input
+              id="durationRange"
+              type="range"
+              min="1"
+              max="60"
+              step="1"
+              value="30"
+            /><input
+              id="durationNumber"
+              type="number"
+              min="1"
+              max="60"
+              step="1"
+              value="30"
+              aria-label="プレイ時間（秒）"
+            /><span>秒</span>
+          </div>
+          <p id="durationError" class="settingError" role="alert"></p>
+        </div>
+        <button id="startBtn">スタート</button>
+        <div class="home-other">
+          <button id="testBtn" class="secondary">PC TEST / DEMO</button
+          ><button id="windLabBtn" class="secondary">3D WIND LAB</button>
+        </div>
+        <p id="startStatus" class="settingError" role="status"></p>
+        <p class="hint">
+          カメラを使います。からだ全体が見える場所に立ってください。
+        </p>
+        <details id="homeDetails">
+          <summary>詳細設定</summary>
+          <fieldset class="settings">
+            <legend>身体と手の感度</legend>
+            <label
+              >落ち葉の感度：からだ
+              <output id="bodySensitivityValue">70%</output
+              ><input
+                id="bodySensitivity"
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value="70"
+            /></label>
+            <label
+              >落ち葉の感度：左手 <output id="leftSensitivityValue">70%</output
+              ><input
+                id="leftSensitivity"
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value="70"
+            /></label>
+            <label
+              >落ち葉の感度：右手 <output id="rightSensitivityValue">70%</output
+              ><input
+                id="rightSensitivity"
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value="70"
+            /></label>
+          </fieldset>
+          <fieldset class="settings">
+            <legend>笑顔の写真</legend>
+            <label
+              ><input id="smileEnabled" type="checkbox" checked />
+              笑顔撮影ON</label
+            >
+            <label
+              >笑顔の閾値 <output id="smileThresholdValue">60%</output
+              ><input
+                id="smileThreshold"
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value="60"
+            /></label>
+            <p class="hint">
+              閾値は笑顔推定スコアの基準です。笑顔の確率や正解率ではありません。写真はこのブラウザのメモリだけに保持し、自動送信・保存はしません。
+            </p>
+            <label class="consent"
+              ><input id="photoConsent" type="checkbox" />
+              保護者・スタッフが本人・保護者の撮影同意を確認しました（今回の参加者）</label
+            >
+            <p class="hint">
+              同意がなければ撮影OFFで遊べます。PCテストモードでは撮影しません。別のタブに移ると一時停止します。
+            </p>
+          </fieldset>
+          <label
+            >むずかしさ
+            <select id="difficulty">
+              <option value="easy">★ やさしい</option>
+              <option value="normal" selected>★★ ふつう</option>
+              <option value="hard">★★★ むずかしい</option>
+            </select></label
+          >
+        </details>
+      </section>
+      <section id="testPanel" class="dev hidden">
+        <b>PC Test</b
+        ><label
+          >体軸
+          <input
+            id="axisSlider"
+            type="range"
+            min="-20"
+            max="20"
+            value="0"
+            step=".2" /></label
+        ><label
+          >左手
+          <input
+            id="leftSlider"
+            type="range"
+            min="0"
+            max="1"
+            value=".3"
+            step=".01" /></label
+        ><label
+          >右手
+          <input
+            id="rightSlider"
+            type="range"
+            min="0"
+            max="1"
+            value=".3"
+            step=".01"
+        /></label>
+        <p class="demoHint">
+          X/Yを動かすか、画面をドラッグして手の風を動かせます。強度0では手の風は止まります。
+        </p>
+        <label
+          >左手 X
+          <input
+            id="leftX"
+            type="range"
+            min="0"
+            max="100"
+            value="30"
+            step="1" /></label
+        ><label
+          >左手 Y
+          <input
+            id="leftY"
+            type="range"
+            min="0"
+            max="100"
+            value="50"
+            step="1" /></label
+        ><label
+          >右手 X
+          <input
+            id="rightX"
+            type="range"
+            min="0"
+            max="100"
+            value="70"
+            step="1" /></label
+        ><label
+          >右手 Y
+          <input id="rightY" type="range" min="0" max="100" value="50" step="1"
+        /></label>
+      </section>
+      <button id="researchToggle" class="corner">Research</button>
+      <section id="research" class="dev hidden">
+        <pre id="metrics"></pre>
+        <button id="csvBtn">CSV</button>
+      </section>
+      <section id="finish" class="panel hidden">
+        <h1>🌳 おおきな きに なったね！</h1>
+        <div id="result"></div>
+        <h2>撮影した写真</h2>
+        <p id="noPhotos">今回は写真がありません</p>
+        <div id="photoGrid" class="photoGrid"></div>
+        <div class="photoActions">
+          <button id="savePhotoBtn" disabled>写真を保存</button
+          ><button id="deletePhotoBtn" disabled>写真を削除</button>
+        </div>
+        <button id="againBtn">もういっかい</button>
+        <p class="hint">
+          次の参加者に交代すると、この試行の写真は消去されます。
+        </p>
+      </section>
+      <dialog id="photoDialog">
+        <img id="photoPreview" alt="撮影した写真の拡大" />
+        <p id="photoCaption"></p>
+        <button id="choosePhotoBtn">PHOTO GIFTに選ぶ</button
+        ><button id="closePhotoBtn">閉じる</button>
+      </dialog>
+      <div id="message"></div>
+    </div>
+    <section id="windLab" class="hidden" aria-label="3D WIND LAB"></section>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
