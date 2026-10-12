@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="seesaw-release" content="20261009-ui-physics">
+  <meta name="theme-color" content="#f7f5e9"><meta name="apple-mobile-web-app-capable" content="yes">
+  <title>シーソーゲーム | 〇〇を落とすな！</title>
+  <link rel="stylesheet" href="./styles.css?v=20261009-ui-physics">
+</head>
+<body>
+  <main id="host-app">
+    <header><a class="brand" href="./"><span>シーソーゲーム</span></a><span class="tag">ちいさな バランスあそび</span></header>
+    <section id="setup">
+      <h1 class="setup-heading">シーソーゲーム</h1>
+      <div class="setup-card">
+        <fieldset id="game-mode" disabled><legend>1. どんな あそび？</legend><div class="mode-cards choices"><button data-game-mode="KEEP" aria-pressed="true">落とさず守ろう<small>30びょう</small></button><button data-game-mode="STAR" aria-pressed="false">落ち葉をあつめよう 🍂<small>30びょう</small></button><button data-game-mode="SURVIVAL" aria-pressed="false">どこまで耐える？<small>設定した時間まで</small></button></div></fieldset><p id="intro-message" class="mode-help">まんなかで、オブジェクトを守ろう！</p>
+        <fieldset class="object-field"><legend>2. なにを落とさない？</legend><label class="object-style-label">見た目<select id="object-style"><option value="svg">イラスト（秋の仲間は絵文字）</option><option value="emoji">絵文字</option></select></label><div id="object-choices" class="object-cards"></div></fieldset>
+        <div id="image-editor" hidden>
+          <p>写真はこのブラウザー内だけで使います。外部に送りません。</p>
+          <label class="file-label">写真・絵をえらぶ<input id="image-file" type="file" accept="image/jpeg,image/png,image/webp"></label>
+          <label>撮影するカメラ<select id="photo-facing"><option value="user">自分向き</option><option value="environment">外向き（作品など）</option></select></label><button id="photo-camera" class="secondary">カメラで撮る・撮り直す</button>
+          <video id="photo-video" autoplay muted playsinline hidden></video><button id="capture" class="secondary" hidden>撮影する</button><button id="stop-photo" class="quiet" hidden>カメラを閉じる</button>
+          <canvas id="crop-preview" width="256" height="256" hidden></canvas>
+          <div id="crop-controls" hidden>
+            <label>大きさ<input id="crop-zoom" type="range" min="1" max="4" step=".05" value="1"></label>
+            <label>左右<input id="crop-x" type="range" min="-1" max="1" step=".02" value="0"></label>
+            <label>上下<input id="crop-y" type="range" min="-1" max="1" step=".02" value="0"></label>
+            <label>かたち<select id="crop-shape"><option value="circle">まる</option><option value="rounded">角丸の四角</option></select></label>
+            <button id="use-image" class="secondary">この画像をつかう</button>
+          </div><p id="image-status" role="status"></p>
+          <button id="discard-images" class="quiet">写真と作品をすべて消す</button>
+        </div>
+        <div class="input-choice"><label for="mode">3. どうやって動かす？</label><select id="mode" disabled><option value="phone">PHONE CONTROLLER（PC＋スマホ）</option><option value="sensor">LOCAL TILT（この端末のかたむき）</option><option value="body">BODY AXIS（からだ・カメラ）</option><option value="test">PC TEST（キー・スライダー）</option></select></div>
+        <fieldset id="difficulty" disabled><legend>4. むずかしさ</legend><div class="choices"><button data-level="easy" aria-pressed="true">★ かんたん</button><button data-level="normal" aria-pressed="false">★★ ふつう</button><button data-level="hard" aria-pressed="false">★★★ むずかしい</button></div></fieldset>
+        <label class="duration-control">5. プレイ時間 <output id="play-duration-value">30びょう</output><input id="play-duration" disabled type="range" min="5" max="60" step="5" value="30"></label>
+        <details id="staff"><summary>スタッフ用 · 音響・カメラ・入力設定</summary>
+          <fieldset id="audio-controls"><legend>音響・音声（PCのスピーカー）</legend>
+<label><input id="audio-effects" type="checkbox" checked>効果音ON</label>
+<label>アラート音<select id="audio-alert"><option value="horn">クラクション</option><option value="whistle">ホイッスル／笛</option><option value="bell" selected>ベル</option><option value="beep">電子音</option><option value="comic">コミカル音</option><option value="none">なし</option></select></label>
+<label>効果音音量<input id="audio-effects-volume" type="range" min="0" max="100" value="50"></label><button id="audio-test" type="button" class="secondary">▶ ためす（効果音）</button>
+<label><input id="audio-voice" type="checkbox" checked>声ON</label><label>音声モード<select id="audio-voice-mode"><option>AUTO</option><option>SELECT</option><option>OFF</option></select></label>
+<label>セリフ<select id="audio-phrase"></select></label><label>SELECTで声を出すとき<select id="audio-event"><option value="danger">危険</option><option value="stable">中央で安定</option><option value="star">落ち葉獲得</option><option value="drop">落下</option><option value="success">成功</option><option value="countdown">残り3秒</option></select></label>
+<label>音声音量<input id="audio-voice-volume" type="range" min="0" max="100" value="70"></label><button id="audio-voice-test" class="secondary">▶ ためす（声）</button><p id="audio-status" role="status"></p><p>BGM：OFF</p></fieldset>
+<label><input id="preview-visible" type="checkbox" checked>カメラプレビュー</label>
+          <label><input id="skeleton" type="checkbox" checked>スケルトン</label>
+          <label><input id="axis-debug" type="checkbox">肩・腰・身体軸</label>
+          <label><input id="preview-mirror" type="checkbox" checked>プレビューを鏡表示</label>
+          <label><input id="input-invert" type="checkbox" checked>身体軸入力の左右を反転（対面カメラ）</label>
+          <label>身体軸の感度<input id="sensitivity" type="range" min=".5" max="2" step=".1" value="1"></label>
+          <output id="confidence">検出Confidence: —</output>
+          <p>肩と腰が映る距離で、カメラを正面・水平に置きます。プレビューの鏡表示と入力の反転は別の設定です。</p>
+        </details>
+        <section id="phone-connection" class="phone-connection">
+          <h2>スマホをつなぐ</h2><p class="connection-help">PCがゲーム画面。スマホはラインのセンサー。</p>
+          <details id="qr-panel" open><summary>QR・ROOM・接続URL</summary><div id="qr" aria-label="スマホController接続QRコード"></div>
+          <p id="room-code" class="room-code"></p>
+          <a id="controller-link" target="_blank" rel="noopener" hidden></a>
+          <p id="qr-note" class="status">接続用のQRコードを準備しています…</p>
+          </details><div class="connection-checks"><p id="connection-state" role="status">○ スマホをつないでください</p><p id="sensor-state">○ スマホでセンサーをONにしてください</p><p id="center-state">○ スマホで「まんなかにする」を押してください</p></div>
+          <details class="connection-options"><summary>接続設定・つなぎ直し</summary><label for="controller-base">スマホから開けるゲームのHTTPS URL</label><input type="url" id="controller-base"><button id="update-qr" class="secondary">URLをQRに反映</button><button id="new-room" class="quiet">ROOMを作り直す</button></details>
+        <button id="phone-retry" class="secondary">再接続</button><button id="phone-center" class="secondary" disabled>スマホの中央姿勢を設定</button></section>
+        <div id="local-preparation" class="preparation" hidden><button id="connect" class="secondary">① センサーをつかう</button><button id="center" class="secondary" disabled>② まんなかにする</button></div>
+        <p id="status" class="status" role="status">スマホを固定して、①からはじめよう。</p>
+        <button id="start" class="primary" disabled>あそぶ！ <span><span id="duration-label">30びょう</span> →</span></button>
+        <p class="safety">スマートフォンが落ちないよう、しっかり固定してください</p>
+      </div>
+    </section>
+    <section id="play" hidden>
+      <h2 id="play-title" class="play-title"></h2><div class="hud"><span><span id="time-label">あと</span> <strong id="time">30</strong> びょう</span><span class="stars" id="score-hud"><span id="score-label">落下</span> <strong id="stars">0</strong></span><button id="pause" class="quiet">おやすみ</button></div>
+      <p id="message" class="game-message" role="status">そのまま！</p>
+      <div id="leaf-flights" aria-hidden="true"></div><div id="scene" class="scene"><div id="leaf-background" aria-hidden="true" hidden></div><div class="cloud cloud-one"></div><div class="cloud cloud-two"></div><div class="hill"></div><div id="platform" class="platform"><div id="zone" class="safe-zone"></div></div><div id="egg" class="game-object"></div><div class="pivot"></div></div>
+      <div id="start-countdown" class="start-countdown" role="status" aria-live="assertive" hidden><strong id="countdown-number">3</strong><p>まんなかで、じゅんび！</p></div>
+      <div id="pause-panel" class="pause-panel" hidden><h2>ひとやすみ</h2><p id="pause-reason">準備ができたら、つづけよう。</p><button id="resume" class="primary">つづける</button><button id="reset-center" class="secondary">まんなかにして つづける</button><button id="quit" class="quiet">はじめにもどる</button></div>
+    </section>
+    <section id="result" hidden><div id="result-object" class="result-object"></div><div id="celebration" class="celebration">✦ ✦ ✦</div><span class="eyebrow">よく がんばったね</span><h1 id="result-title">できた！</h1><p class="result-stars"><span id="total-stars">0</span></p><p id="result-message">よく がんばったね。</p><button id="again" class="primary">もういっかい ↻</button><button id="other-game" class="secondary">べつのゲーム</button><button id="gift-open" class="secondary">おみやげフォトをつくる</button><button id="result-new-participant" class="secondary participant-button">次の参加者</button><p class="participant-help">写真・作品・個人データを削除して最初に戻ります</p><div id="result-leaves" class="leaf-pile" aria-hidden="true" hidden></div><details id="research"><summary>おとなの方へ · 研究用データ</summary><p id="storage-note"></p><pre id="metrics"></pre><button id="samples-csv" class="secondary">記録CSV</button><button id="summary-csv" class="secondary">集計CSV</button></details></section>
+    <section id="gift" hidden><h1>おみやげフォト</h1><div id="gift-editor"></div><canvas id="gift-canvas" width="1080" height="1620"></canvas><p id="gift-status" role="status"></p><button id="gift-save" class="primary">PNGを保存</button><button id="gift-send" class="secondary">スマホにおくる</button><p id="gift-transfer-status" role="status"></p><section id="gift-transfer" hidden><h2>写真を受け取るQR</h2><div id="gift-qr"></div><a id="gift-link" target="_blank" rel="noopener"></a><p>PCを開いたまま受信してください。10分間有効。通信できない場合はPCのPNG保存を使えます。</p><button id="gift-transfer-stop" class="quiet">転送終了・一時データを破棄</button></section><button id="gift-back" class="secondary">結果にもどる</button><button id="gift-discard" class="quiet">写真・作品を消す</button><button id="new-participant" class="secondary participant-button">次の参加者</button><p class="participant-help">写真・作品・個人データを削除して最初に戻ります</p></section>
+    <aside id="body-preview" hidden><div class="camera-view"><video id="body-video" autoplay muted playsinline></video><canvas id="body-overlay"></canvas></div><p>肩と腰をカメラにうつしてね</p></aside>
+    <aside id="test-controls" hidden><label for="tilt">PC Test Mode <output id="tilt-value">0°</output></label><input id="tilt" type="range" min="-30" max="30" step="1" value="0"><p>← 左へ　→ 右へ　Space まっすぐ</p></aside>
+    <footer>ちいさな「できた！」を、ひとつずつ。</footer>
+  </main>
+  <main id="controller-app" hidden>
+    <span class="eyebrow">SMARTPHONE CONTROLLER</span><h1>スマホController</h1><p id="controller-title">シーソーゲーム</p>
+    <p class="controller-instructions">スマホをラインに<br><strong>しっかり固定してください</strong></p>
+    <button id="controller-enable" class="primary" disabled>センサーをON</button>
+    <p id="controller-connection" class="controller-connection" role="status">○ PCにつないでいます…</p>
+    <p id="controller-sensor-state" class="status" role="status">センサーをONにしてから、まんなかを設定してください。</p>
+    <p>現在のかたむき</p><div id="controller-gauge" class="controller-gauge" role="meter" aria-label="現在のかたむき" aria-valuemin="-30" aria-valuemax="30" aria-valuenow="0"><span class="gauge-center"></span><span id="controller-indicator"></span></div>
+    <button id="controller-center" class="secondary" disabled>まんなかにする</button>
+    <p id="controller-host-state" class="status">準備ができたら、PCの画面を見てください。</p>
+    <button id="controller-retry" class="quiet">PCにつなぎ直す</button>
+    <aside id="controller-test" hidden><strong>開発用・模擬センサー入力</strong><p>実センサーではありません。PCにも模擬入力として記録します。</p><label for="controller-test-tilt">模擬傾き</label><input id="controller-test-tilt" type="range" min="-30" max="30" step="1" value="0"></aside>
+  </main>
+  <main id="gift-receiver" hidden><span class="eyebrow">PHOTO GIFT</span><h1>おみやげフォトを受け取る</h1><p id="receive-status" role="status">写真のPCにつないでいます…</p><img id="receive-image" alt="風に立つ 記念フォト"><a id="receive-save" class="primary" download="kaze-ni-tatsu-2026-10-18.png" hidden>写真を保存</a><button id="receive-share" class="secondary" hidden>共有・写真に保存</button><p>iPhoneで保存できないときは、画像を長押しして「写真に保存」を選んでください。Androidは「写真を保存」からダウンロードできます。</p><button id="receive-retry" class="secondary">再試行</button><button id="receive-discard" class="quiet">受信写真・接続を破棄</button></main>
+  <script src="./vendor/peerjs-1.5.5.min.js"></script>
+  <script src="./vendor/qrcode-1.0.0.min.js"></script>
+  <script type="module" src="./src/bootstrap.js?v=20261009-ui-physics"></script>
+</body>
+</html>
