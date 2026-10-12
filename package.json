@@ -1,0 +1,11 @@
+{
+  "name": "kaze-ni-tatsu-playground",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/unit.test.mjs",
+    "test:browser": "npm run build && node --test tests/browser.test.mjs"
+  },
+  "devDependencies": { "playwright-core": "1.61.1" }
+}

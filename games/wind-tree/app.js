@@ -942,13 +942,18 @@ $("#windLabBtn").onclick = async () => {
       },
     });
   } catch (e) {
+    console.error("3D WIND LAB startup failed", e);
     labInstance?.dispose();
+    labInstance = null;
     $("#app").prepend(video);
     $("#app").classList.remove("hidden");
     $("#windLab").classList.add("hidden");
     if (labActive) gameFrame = requestAnimationFrame(loop);
     labActive = false;
-    $("#startStatus").textContent = "3D WIND LABを開始できませんでした。";
+    const reason = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+    $("#startStatus").textContent =
+      `3D WIND LABを開始できませんでした。原因: ${reason}。` +
+      "ネットワーク・必要なファイル・ブラウザーのWebGL対応を確認してください。";
   } finally {
     labOpening = false;
   }

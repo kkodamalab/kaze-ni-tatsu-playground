@@ -3,8 +3,8 @@ import {
   RESPONSE_KEYS,
 } from "./src/wind-engine/WindResponse.js";
 import { WIND_COLORS } from "./src/wind-engine/WindColors.js";
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
-import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+import * as THREE from "./vendor/three/three.module.js";
+import { OrbitControls } from "./vendor/three/OrbitControls.js";
 import { WindConfig, RANGES } from "./src/wind-engine/WindConfig.js";
 import { WindEngine } from "./src/wind-engine/WindEngine.js";
 import { WeatherWind } from "./src/wind-engine/WeatherWind.js";
@@ -150,11 +150,8 @@ export class WindLab {
       document.addEventListener("visibilitychange", this.visibility);
       this.raf = requestAnimationFrame((t) => this.frame(t));
     } catch (e) {
-      this.message(
-        "3D描画を開始できません。WebGL2を利用できるブラウザーをお使いください。",
-      );
-      this.renderer?.dispose();
-      this.renderer?.forceContextLoss();
+      this.dispose();
+      throw e;
     }
   }
   mount() {
