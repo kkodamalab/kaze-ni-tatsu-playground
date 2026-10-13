@@ -12,7 +12,14 @@ export class HandWind {
     this.jumpCandidate = null;
     this.jumpCount = 0;
   }
-  input(position, dt, c = { handSmoothing: 30, handSpeedThreshold: 0.15 }) {
+  input(
+    position,
+    dt,
+    c = { handSmoothing: 30, handSpeedThreshold: 0.15 },
+    velocityScale = 1,
+  ) {
+    velocityScale =
+      Number.isFinite(velocityScale) && velocityScale > 0 ? velocityScale : 1;
     if (
       !position?.length ||
       position.length !== 3 ||
@@ -29,13 +36,14 @@ export class HandWind {
     let fresh = !this.previous || this.age > 1 || dt <= 0 || dt > 1;
     if (
       !fresh &&
-      Math.hypot(...raw.map((v, i) => v - this.previous[i])) >
+      Math.hypot(...raw.map((v, i) => v - this.previous[i])) / velocityScale >
         Math.max(1.5, Math.min(dt, 0.25) * 40)
     ) {
       this.rejected++;
       this.jumpCount =
         this.jumpCandidate &&
-        Math.hypot(...raw.map((v, i) => v - this.jumpCandidate[i])) < 0.3
+        Math.hypot(...raw.map((v, i) => v - this.jumpCandidate[i])) <
+          0.3 * velocityScale
           ? this.jumpCount + 1
           : 1;
       this.jumpCandidate = raw;
@@ -56,8 +64,9 @@ export class HandWind {
       fresh ? v : old[i] + (v - old[i]) * alpha,
     );
     let target = this.position.map((v, i) => (fresh ? 0 : (v - old[i]) / dt));
+    this.wristSpeed = Math.hypot(...target);
+    target = target.map((v) => v / velocityScale);
     const speed = Math.hypot(...target);
-    this.wristSpeed = speed;
     if (speed < (c.handSpeedThreshold ?? 0.15)) target = zero();
     else if (speed > 20) target = target.map((v) => (v * 20) / speed);
     if (!fresh) {

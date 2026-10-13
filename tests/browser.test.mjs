@@ -506,7 +506,7 @@ test("CAMERA ON uses real asynchronous PosePipeline with synthetic upper/full Po
   await page.route("**/pose-worker.js", (route) =>
     route.fulfill({
       contentType: "text/javascript",
-      body: `let mode='upper',sequence,begin;onmessage=async({data:d})=>{if(d.type==='init'){({poseSequence:sequence}=await import('./src/wind-lab/PoseSequences.js'));postMessage({type:'ready'});}if(d.type==='test'){mode=d.mode;}if(d.type==='frame'){begin??=d.timestamp;const s=sequence('F',(d.timestamp-begin)/1000);if(mode==='upper'){for(let i=23;i<33;i++)s.landmarks[i].visibility=.05;s.worldLandmarks[13].x=NaN;}if(mode==='lost')s.landmarks=null;d.bitmap.close();setTimeout(()=>postMessage({type:'result',timestamp:d.timestamp,generation:d.generation,result:{landmarks:s.landmarks?[s.landmarks]:[],worldLandmarks:s.worldLandmarks?[s.worldLandmarks]:[]}}),25);}}`,
+      body: `let mode='upper',sequence,begin;onmessage=async({data:d})=>{if(d.type==='init'){({poseSequence:sequence}=await import('./src/wind-lab/PoseSequences.js'));postMessage({type:'ready'});}if(d.type==='test'){mode=d.mode;}if(d.type==='frame'){begin??=d.timestamp;const aspect=d.bitmap.width/d.bitmap.height;const s=sequence('F',(d.timestamp-begin)/1000);s.worldLandmarks=s.landmarks.map(p=>({...p,x:(p.x-.5)*2*aspect,y:(p.y-.62)*2,z:p.z*2*aspect}));if(mode==='upper'){for(let i=23;i<33;i++)s.landmarks[i].visibility=.05;s.worldLandmarks[13].x=NaN;}if(mode==='lost')s.landmarks=null;d.bitmap.close();setTimeout(()=>postMessage({type:'result',timestamp:d.timestamp,generation:d.generation,result:{landmarks:s.landmarks?[s.landmarks]:[],worldLandmarks:s.worldLandmarks?[s.worldLandmarks]:[]}}),25);}}`,
     }),
   );
   await page.route("https://**/*", (r) => r.abort());
@@ -552,6 +552,23 @@ test("CAMERA ON uses real asynchronous PosePipeline with synthetic upper/full Po
   assert.equal(upper.skeleton, 33);
   assert.ok(upper.poseAge < 500);
   console.log("CAMERA UPPER MEASURE", JSON.stringify(upper));
+  for (const size of [20, 100, 183, 300]) {
+    await page.locator("#lab-avatarSize").fill(String(size));
+    await page.waitForTimeout(400);
+    assert.ok(
+      await page.evaluate(() =>
+        ["left", "right"].every((side) =>
+          cameraAudit.lab.avatar
+            .wrist(side)
+            .every(
+              (v, k) =>
+                Math.abs(v - cameraAudit.lab.engine[side].position[k]) < 1e-5,
+            ),
+        ),
+      ),
+    );
+  }
+  await page.locator("#lab-avatarSize").fill("100");
   for (const mode of ["DOT", "KIDS", "ART"]) {
     await page.locator("[data-mode=" + mode + "]").click();
     await page.locator(".lab-details").evaluate((e) => (e.open = true));
