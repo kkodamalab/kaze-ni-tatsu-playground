@@ -1,7 +1,7 @@
-import { sceneGeometry, rollingAngle } from './geometry.js?v=20261009-ui-physics';
+import { sceneGeometry, rollingAngle } from './geometry.js?v=20261016-device-tuning';
 import { config, objects, gameModes, isImageObject } from './config.js?v=20261009-ui-physics';
 import { VBFInput, TiltInput, clamp } from './input.js?v=20261009-ui-physics';
-import { SeesawGame, toCSV } from './game.js?v=20261009-ui-physics';
+import { SeesawGame, toCSV } from './game.js?v=20261016-device-tuning';
 import { BodyInput, BodyCamera } from './body.js?v=20261009-ui-physics';
 import { renderObject } from './art.js?v=20261009-ui-physics';
 import { loadImage, drawCrop, saveCanvas } from './images.js?v=20261009-ui-physics';
@@ -12,7 +12,11 @@ import { GameAudio, phrases } from './audio.js?v=20261009-ui-physics';
 import { GiftEditor } from './gift-editor.js?v=20261009-ui-physics';
 import { StartCountdown } from './countdown.js?v=20261009-ui-physics';
 import { LeafEffects, leafPile } from './leaves.js?v=20261009-ui-physics';
+import { DeviceTuning, tuneSample } from './device-tuning.js';
 const $ = id => document.getElementById(id);
+let tuningStorage;
+try { tuningStorage = localStorage; } catch { /* Private browsing can disable storage. */ }
+const deviceTuning = new DeviceTuning(tuningStorage);
 const audio = new GameAudio(globalThis,text => $('audio-status').textContent=text);
 const giftEditor = new GiftEditor(() => discardImages());
 const countdown=new StartCountdown();
@@ -48,6 +52,28 @@ const phoneHost = new PhoneHost({
   onDisconnect: reason => pause(reason),
 });
 const input = () => mode === 'phone' ? phoneHost.input : mode === 'test' ? testInput : mode === 'body' ? bodyInput : tiltInput;
+const tunedInput = () => tuneSample(input().read(), deviceTuning.values, mode === 'body' ? bodyInput.sensitivity : 1);
+function syncTuning() {
+  const values = deviceTuning.values;
+  for (const key of Object.keys(values)) {
+    const value = key === 'boardLength' ? Math.round(values[key] * 100) : values[key];
+    $('tuning-' + key).value = value;
+    $('tuning-value-' + key).textContent = key === 'boardLength' ? `${value}%` : key === 'maxGameAngle' ? `${value}°` : values[key].toFixed(1) + (key === 'angleGain' ? '倍' : '');
+  }
+}
+function changeTuning(values) {
+  deviceTuning.configure(values);
+  game?.configureTuning(deviceTuning.values);
+  if (game && trialMetadata) (trialMetadata.tuningChanges ??= []).push({timestamp: game.elapsed, ...deviceTuning.values});
+  syncTuning();
+  $('tuning-storage-status').textContent = deviceTuning.saved ? 'この端末に保存しました。次の参加者でも保持します。' : 'このブラウザーでは保存できません。現在の画面でのみ適用します。';
+  render();
+}
+for (const key of Object.keys(deviceTuning.values)) $('tuning-' + key).addEventListener('input', event => {
+  changeTuning({[key]: Number(event.target.value) / (key === 'boardLength' ? 100 : 1)});
+});
+$('tuning-reset').onclick = () => { deviceTuning.reset(); changeTuning(deviceTuning.values); };
+syncTuning();
 const fresh = () => inputFresh(input(), mode, performance.now());
 function show(next) {
   if (phase === 'gift' && next !== 'gift') giftEditor.close();
@@ -56,6 +82,7 @@ function show(next) {
   $('start-countdown').hidden=next!=='countdown';
   for (const name of ['setup', 'play', 'result', 'gift']) $(name).hidden = name !== (next==='countdown'?'play':next);
   $('test-controls').hidden = mode !== 'test' || !['setup','play','countdown'].includes(next);
+  $('device-tuning').hidden = !['setup','play','countdown'].includes(next);
   updatePreview();
   window.scrollTo(0, 0);
 }
@@ -145,10 +172,10 @@ $('start').addEventListener('click', () => {
   if(phase!=='setup' || countdown.active)return;
   if (!fresh() || !input().calibrated) { $('status').textContent = '入力を確認して、まんなかを設定してね。'; return; }
   if (isImageObject(objectType) && !images[objectType]) { $('status').textContent = '写真や作品をえらんでね。'; return; }
-  const audioReady=audio.unlock(); audio.reset(); stopPhoto(); game = new SeesawGame(difficulty, { gameMode, objectType, inputMode: mode, duration });
+  const audioReady=audio.unlock(); audio.reset(); stopPhoto(); game = new SeesawGame(difficulty, { gameMode, objectType, inputMode: mode, duration, tuning: deviceTuning.values });
   renderObject($('egg'),objectType,images[objectType],objectStyle); paused = false; needsCenter = false;
   trialMetadata = { preparedAt: new Date().toISOString(), startedAt: null, inputMode: mode, baselineAngle: input().baselineAngle,
-    roomId: mode === 'phone' ? phoneHost.room : null, controllerInputType: mode === 'phone' ? input().inputType : null, controllerCalibrationKey: mode === 'phone' ? phoneHost.calibrationKey() : null, gameMode, objectType, objectStyle, configuredDuration: duration, sensitivity: bodyInput.sensitivity, inputInverted: mode === 'body' && bodyInput.invert, filterAlpha: config.alpha, sampleInterval: config.sampleInterval, difficulty, settings: { ...game.settings } };
+    roomId: mode === 'phone' ? phoneHost.room : null, controllerInputType: mode === 'phone' ? input().inputType : null, controllerCalibrationKey: mode === 'phone' ? phoneHost.calibrationKey() : null, gameMode, objectType, objectStyle, configuredDuration: duration, sensitivity: bodyInput.sensitivity, inputInverted: mode === 'body' && bodyInput.invert, filterAlpha: config.alpha, sampleInterval: config.sampleInterval, difficulty, settings: { ...game.settings }, initialDeviceTuning: {...deviceTuning.values} };
   accumulator = 0; previous = performance.now(); const preparedAt=previous; countdown.start(preparedAt); countdownLabel=''; leaves.reset(); $('start').disabled=true; show('countdown'); countdownDisplay('3',false); render();
   audioReady.then(()=>{if(phase==='countdown' && countdown.startedAt===preparedAt && countdownLabel==='3')audio.tone('countdown');});
 });
@@ -165,23 +192,26 @@ window.addEventListener('pagehide', () => { audio.stop(); phoneHost.stop(); clea
 $('tilt').addEventListener('input', () => { testAngle = Number($('tilt').value); });
 window.addEventListener('keydown', event => {
   if (mode !== 'test' || !['setup','play','countdown'].includes(phase) || !['ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) return;
-  if (event.target.matches('select,textarea,input:not([type=range])')) return;
+  if (event.target.closest('#device-tuning') || event.target.matches('select,textarea,input:not([type=range])')) return;
   event.preventDefault();
   testAngle = event.code === 'Space' ? 0 : clamp(testAngle + (event.code === 'ArrowRight' ? 2 : -2), -30, 30);
   $('tilt').value = testAngle;
 });
 function render() {
   if (!game) return;
-  const angle = phase==='countdown' ? 0 : input().read().gameAngle;
-  const size=$('egg').offsetWidth, geo=sceneGeometry($('scene').clientWidth,$('scene').clientHeight,game.position,angle,size);
+  const angle = phase==='countdown' ? 0 : tunedInput().gameAngle;
+  const size=$('egg').offsetWidth, geo=sceneGeometry($('scene').clientWidth,$('scene').clientHeight,game.position,angle,size,0,game.tuning.boardLength);
   $('scene').style.setProperty('--pivot-y',`${geo.pivotY}px`);$('scene').style.setProperty('--ground-y',`${geo.ground}px`);$('scene').style.setProperty('--support-height',`${geo.support}px`);
   $('platform').style.transform = `rotate(${angle}deg)`;
+  $('platform').style.width = `${geo.length}px`;
+  $('platform').style.left = `calc(50% - ${geo.length / 2}px)`;
+  $('platform').dataset.gameAngle = String(angle);
   $('platform').classList.toggle('safe', game.isSafe);
   $('zone').style.width = `${game.settings.safeZoneWidth * 100}%`;
 
   const falling = game.respawn > 0;
   const fallProgress = falling ? 1 - game.respawn / config.respawnSeconds : 0;
-  const point=sceneGeometry($('scene').clientWidth,$('scene').clientHeight,game.position,angle,size,fallProgress).center;
+  const point=sceneGeometry($('scene').clientWidth,$('scene').clientHeight,game.position,angle,size,fallProgress,game.tuning.boardLength).center;
   $('egg').style.left=`${point.x}px`;$('egg').style.top=`${point.y}px`;
   const spin=['BALL','SOCCER_BALL','BASKETBALL'].includes(objectType)?rollingAngle(game.rotation/500,geo.length,size):angle;
   $('egg').style.transform=`translate(-50%,-50%) rotate(${spin}deg)`;
@@ -218,9 +248,14 @@ function downloadCSV(name, rows) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 $('samples-csv').addEventListener('click', () => downloadCSV('keep-the-egg-samples.csv', game.samples));
-$('summary-csv').addEventListener('click', () => downloadCSV('keep-the-egg-summary.csv', [{ ...trialMetadata, settings: JSON.stringify(trialMetadata.settings), recalibrations: JSON.stringify(trialMetadata.recalibrations ?? []), ...game.summary() }]));
+$('summary-csv').addEventListener('click', () => downloadCSV('keep-the-egg-summary.csv', [{ ...trialMetadata, settings: JSON.stringify(trialMetadata.settings), recalibrations: JSON.stringify(trialMetadata.recalibrations ?? []), initialDeviceTuning: JSON.stringify(trialMetadata.initialDeviceTuning), tuningChanges: JSON.stringify(trialMetadata.tuningChanges ?? []), ...game.summary() }]));
 function frame(now) {
   if (mode === 'test') { testInput.push(testAngle, now); $('tilt-value').textContent = `${testAngle}°`; }
+  const sample = tunedInput();
+  for (const [id, value] of [['relative', sample.relativeAngle], ['game', sample.gameAngle]]) {
+    const text = fresh() && Number.isFinite(value) ? `${value >= 0 ? '+' : ''}${value.toFixed(1)}°` : '入力待ち';
+    if ($('tuning-live-' + id).textContent !== text) $('tuning-live-' + id).textContent = text;
+  }
   if (mode === 'phone') phoneHost.update();
   if (mode === 'body') $('confidence').textContent = `検出Confidence: ${bodyInput.confidence.toFixed(2)}`;
   if (phase === 'setup') { $('center').disabled = !fresh(); $('start').disabled = !fresh() || !input().calibrated || (isImageObject(objectType) && !images[objectType]); }
@@ -239,7 +274,7 @@ function frame(now) {
     if (reason) pause(reason);
     else {
       accumulator += Math.max(0, dt);
-      while (accumulator >= config.step && !game.done) { game.step(config.step, input().read()); accumulator -= config.step; }
+      while (accumulator >= config.step && !game.done) { game.step(config.step, tunedInput()); accumulator -= config.step; }
       audio.update(game); render();
       if (game.done) finish();
     }

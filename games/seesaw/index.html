@@ -2,10 +2,10 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="seesaw-release" content="20261009-ui-physics">
+  <meta name="seesaw-release" content="20261016-device-tuning">
   <meta name="theme-color" content="#f7f5e9"><meta name="apple-mobile-web-app-capable" content="yes">
   <title>シーソーゲーム | 〇〇を落とすな！</title>
-  <link rel="stylesheet" href="./styles.css?v=20261009-ui-physics">
+  <link rel="stylesheet" href="./styles.css?v=20261016-device-tuning">
 </head>
 <body>
   <main id="host-app">
@@ -76,6 +76,20 @@
     <section id="gift" hidden><h1>おみやげフォト</h1><div id="gift-editor"></div><canvas id="gift-canvas" width="1080" height="1620"></canvas><p id="gift-status" role="status"></p><button id="gift-save" class="primary">PNGを保存</button><button id="gift-send" class="secondary">スマホにおくる</button><p id="gift-transfer-status" role="status"></p><section id="gift-transfer" hidden><h2>写真を受け取るQR</h2><div id="gift-qr"></div><a id="gift-link" target="_blank" rel="noopener"></a><p>PCを開いたまま受信してください。10分間有効。通信できない場合はPCのPNG保存を使えます。</p><button id="gift-transfer-stop" class="quiet">転送終了・一時データを破棄</button></section><button id="gift-back" class="secondary">結果にもどる</button><button id="gift-discard" class="quiet">写真・作品を消す</button><button id="new-participant" class="secondary participant-button">次の参加者</button><p class="participant-help">写真・作品・個人データを削除して最初に戻ります</p></section>
     <aside id="body-preview" hidden><div class="camera-view"><video id="body-video" autoplay muted playsinline></video><canvas id="body-overlay"></canvas></div><p>肩と腰をカメラにうつしてね</p></aside>
     <aside id="test-controls" hidden><label for="tilt">PC Test Mode <output id="tilt-value">0°</output></label><input id="tilt" type="range" min="-30" max="30" step="1" value="0"><p>← 左へ　→ 右へ　Space まっすぐ</p></aside>
+    <details id="device-tuning">
+      <summary>スタッフ用設定 · 実機調整</summary>
+      <p>中央補正後の角度をゲーム用に増幅します。実機の計測値や難易度は変更しません。GiBoard／スラックラインでは小さい倍率から調整してください。</p>
+      <div class="tuning-live"><span>実機角度（中央補正後）：<output id="tuning-live-relative">入力待ち</output></span><span>ゲーム角度：<output id="tuning-live-game">入力待ち</output></span></div>
+      <div class="tuning-grid">
+        <label for="tuning-angleGain">角度倍率 ANGLE GAIN <output id="tuning-value-angleGain">1.0倍</output><input id="tuning-angleGain" type="range" min="0.5" max="5" step="0.1" value="1"></label>
+        <label for="tuning-maxGameAngle">ゲーム内最大角度 MAX GAME ANGLE <output id="tuning-value-maxGameAngle">30°</output><input id="tuning-maxGameAngle" type="range" min="10" max="35" step="1" value="30"></label>
+        <label for="tuning-boardLength">板の長さ BOARD LENGTH <output id="tuning-value-boardLength">100%</output><input id="tuning-boardLength" type="range" min="70" max="130" step="1" value="100"></label>
+        <label for="tuning-objectResponse">物体反応 OBJECT RESPONSE <output id="tuning-value-objectResponse">1.0</output><input id="tuning-objectResponse" type="range" min="0.5" max="2" step="0.1" value="1"></label>
+      </div>
+      <p>BODY AXIS の感度・左右反転は既存の入力設定を適用します。板長は板端までの移動距離にも反映します。支点の高さは従来どおりです。</p>
+      <button id="tuning-reset" type="button" class="secondary">実機調整を初期値に戻す</button>
+      <p id="tuning-storage-status" role="status">設定はこの端末に保存し、次の参加者でも保持します。</p>
+    </details>
     <footer>ちいさな「できた！」を、ひとつずつ。</footer>
   </main>
   <main id="controller-app" hidden>
@@ -93,6 +107,6 @@
   <main id="gift-receiver" hidden><span class="eyebrow">PHOTO GIFT</span><h1>おみやげフォトを受け取る</h1><p id="receive-status" role="status">写真のPCにつないでいます…</p><img id="receive-image" alt="風に立つ 記念フォト"><a id="receive-save" class="primary" download="kaze-ni-tatsu-2026-10-18.png" hidden>写真を保存</a><button id="receive-share" class="secondary" hidden>共有・写真に保存</button><p>iPhoneで保存できないときは、画像を長押しして「写真に保存」を選んでください。Androidは「写真を保存」からダウンロードできます。</p><button id="receive-retry" class="secondary">再試行</button><button id="receive-discard" class="quiet">受信写真・接続を破棄</button></main>
   <script src="./vendor/peerjs-1.5.5.min.js"></script>
   <script src="./vendor/qrcode-1.0.0.min.js"></script>
-  <script type="module" src="./src/bootstrap.js?v=20261009-ui-physics"></script>
+  <script type="module" src="./src/bootstrap.js?v=20261016-device-tuning"></script>
 <script type="module" src="./playground-session.js"></script></body>
 </html>

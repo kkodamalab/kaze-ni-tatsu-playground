@@ -1,19 +1,27 @@
 import { config, difficulties, gameModes, physicsSettings, playDuration } from './config.js?v=20261009-ui-physics';
 import { clamp } from './input.js?v=20261009-ui-physics';
+import { sanitizeTuning } from './device-tuning.js';
 
 export class SeesawGame {
-  constructor(difficulty = 'easy', { gameMode = 'STAR', objectType = 'EGG', inputMode = 'sensor', duration }  = {}) {
+  constructor(difficulty = 'easy', { gameMode = 'STAR', objectType = 'EGG', inputMode = 'sensor', duration, tuning }  = {}) {
     if (!difficulties[difficulty]) throw new Error('Unknown difficulty');
     this.difficulty = difficulty;
     if (!gameModes[gameMode]) throw new Error('Unknown game mode');
     this.gameMode = gameMode; this.objectType = objectType; this.inputMode = inputMode;
     this.duration = duration === undefined ? gameModes[gameMode].duration : playDuration(duration); this.maxStars = Math.floor(this.duration / config.starSeconds); this.rotation = 0; this.paused = false;
     this.settings = physicsSettings(difficulty, objectType);
+    this.tuning = sanitizeTuning(tuning);
     this.elapsed = 0; this.position = 0; this.velocity = 0;
     this.stars = 0; this.drops = 0; this.safeTime = 0; this.streak = 0;
     this.respawn = 0; this.done = false; this.isSafe = true;
     this.angleSum = 0; this.angleSquareSum = 0; this.maxAbsAngle = 0;
     this.samples = []; this.nextSample = 0;
+  }
+  configureTuning(value) {
+    const next = sanitizeTuning(value);
+    // Keep physical speed continuous when staff change the board length mid-trial.
+    this.velocity *= this.tuning.boardLength / next.boardLength;
+    this.tuning = next;
   }
   // Called with a fixed timestep by the renderer. No DOM or sensor dependencies.
   step(dt, input) {
@@ -21,7 +29,7 @@ export class SeesawGame {
     dt = Math.min(dt, this.duration - this.elapsed);
     const { relativeAngle, rawAngle } = input;
     if (!Number.isFinite(relativeAngle) || !Number.isFinite(rawAngle)) return;
-    const gameAngle = clamp(input.gameAngle ?? relativeAngle, -config.maxAngle, config.maxAngle);
+    const gameAngle = clamp(input.gameAngle ?? relativeAngle * this.tuning.angleGain, -this.tuning.maxGameAngle, this.tuning.maxGameAngle);
     if (!Number.isFinite(gameAngle)) return;
     const p = this.settings;
     if (this.respawn > 0) {
@@ -29,9 +37,13 @@ export class SeesawGame {
       if (!this.respawn) { this.position = 0; this.velocity = 0; }
     } else {
       const centering = p.centering * Math.max(0, 1 - Math.abs(gameAngle) / 10);
-      this.velocity += (p.gravity * Math.sin(gameAngle * Math.PI / 180) - centering * this.position) * dt;
+      const length = this.tuning.boardLength;
+      // Convert baseline-board physical acceleration/speed to normalized board units.
+      // Ends stay +/-1; a short board takes less physical travel to reach an end.
+      const acceleration = (p.gravity * Math.sin(gameAngle * Math.PI / 180) - centering * this.position * length) * this.tuning.objectResponse;
+      this.velocity += acceleration / length * dt;
       this.velocity *= Math.exp(-p.damping * dt);
-      this.velocity = clamp(this.velocity, -p.maxSpeed, p.maxSpeed);
+      this.velocity = clamp(this.velocity, -p.maxSpeed / length, p.maxSpeed / length);
       this.position += this.velocity * dt; this.rotation += this.velocity * dt * 500;
       if (Math.abs(this.position) > 1) {
         this.drops++; if (this.gameMode === 'SURVIVAL') this.done = true; this.respawn = config.respawnSeconds; this.streak = 0;
@@ -52,7 +64,8 @@ export class SeesawGame {
       this.samples.push({ timestamp: +this.elapsed.toFixed(4), rawAngle, relativeAngle,
         eggPosition: this.position, eggVelocity: this.velocity, isSafeZone: this.isSafe, difficulty: this.difficulty, gameMode: this.gameMode, objectType: this.objectType, inputMode: this.inputMode,
         configuredDuration: this.duration, survivalTime: this.elapsed, dropCount: this.drops, starCount: this.stars, leafCount: this.gameMode === 'STAR' ? this.stars : 0,
-        bodyAxisAngle: input.bodyAxisAngle ?? '', trackingConfidence: input.trackingConfidence ?? '' });
+        bodyAxisAngle: input.bodyAxisAngle ?? '', trackingConfidence: input.trackingConfidence ?? '',
+        rawSensorAngle: rawAngle, relativeSensorAngle: relativeAngle, gameAngle, ...this.tuning });
       this.nextSample = this.elapsed + config.sampleInterval;
     }
     this.done ||= this.elapsed >= this.duration - 1e-8;
@@ -64,7 +77,8 @@ export class SeesawGame {
     return { trialDuration: time, meanAngle: mean, SDAngle: Math.sqrt(Math.max(0, square - mean * mean)),
       RMSE_from_zero: Math.sqrt(square), maxAbsAngle: this.maxAbsAngle,
       safeZoneTime: this.safeTime, safeZonePercentage: time ? this.safeTime / time * 100 : 0,
-      numberOfEggDrops: this.drops, stars: this.stars, gameMode: this.gameMode, objectType: this.objectType, inputMode: this.inputMode, difficulty: this.difficulty, configuredDuration: this.duration, survivalTime: time, dropCount: this.drops, starCount: this.stars, leafCount: this.gameMode === 'STAR' ? this.stars : 0 };
+      numberOfEggDrops: this.drops, stars: this.stars, gameMode: this.gameMode, objectType: this.objectType, inputMode: this.inputMode, difficulty: this.difficulty, configuredDuration: this.duration, survivalTime: time, dropCount: this.drops, starCount: this.stars, leafCount: this.gameMode === 'STAR' ? this.stars : 0,
+      rawSensorAngle: this.samples.at(-1)?.rawSensorAngle ?? '', relativeSensorAngle: this.samples.at(-1)?.relativeSensorAngle ?? '', gameAngle: this.samples.at(-1)?.gameAngle ?? '', ...this.tuning };
   }
 }
 
