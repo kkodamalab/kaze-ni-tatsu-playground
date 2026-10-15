@@ -12,4 +12,4 @@ if (params.has('gift')) {
     const { startController } = await import('./controller.js?v=20261009-ui-physics');
     startController(params.get('room'), { test: params.get('controllerTest') === '1' });
   }
-} else await import('./app.js?v=20261009-ui-physics');
+} else await import('./app.js?v=20261016-device-tuning');

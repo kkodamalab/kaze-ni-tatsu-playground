@@ -1,6 +1,6 @@
 // Physics position stays normalized. Rendering uses scene pixels and the board normal.
-export function sceneGeometry(width, height, position, angle, objectSize, fall = 0) {
-  const length = width * .7, thickness = 18, support = Math.min(58, height * .2);
+export function sceneGeometry(width, height, position, angle, objectSize, fall = 0, boardLength = 1) {
+  const length = width * .7 * boardLength, thickness = 18, support = Math.min(58, height * .2);
   const ground = height * .8, pivotY = ground - support;
   const radians = angle * Math.PI / 180, tangent = { x: Math.cos(radians), y: Math.sin(radians) };
   const normal = { x: Math.sin(radians), y: -Math.cos(radians) };

@@ -46,6 +46,8 @@ before(async () => {
       "--enable-unsafe-swiftshader",
       "--use-fake-device-for-media-stream",
       "--use-fake-ui-for-media-stream",
+      "--disable-background-timer-throttling",
+      "--disable-renderer-backgrounding",
     ],
   });
   await mkdir(resolve(site, "../test-results"), { recursive: true });
@@ -658,4 +660,153 @@ test("CAMERA ON uses real asynchronous PosePipeline with synthetic upper/full Po
     ),
   );
   assert.deepEqual(errors, []);
+});
+
+for (const sign of [-1, 1]) test(`seesaw actual PC TEST ${sign * 5}deg gain3 displays ${sign * 15}deg, moves and falls`, async t => {
+  const {page,errors} = await pageFor(t);
+  await launch(page, 'seesaw');
+  await page.locator('#mode').selectOption('test'); await page.locator('#center').click();
+  await page.locator('#device-tuning summary').click();
+  await page.locator('#tuning-angleGain').fill('3');
+  await page.locator('[data-game-mode="SURVIVAL"]').click();
+  await page.locator('#play-duration').fill('30');
+  await page.locator('#tilt').fill(String(sign*5));
+  await page.waitForFunction(sign => document.querySelector('#tuning-live-game').textContent === `${sign > 0 ? '+' : '-'}15.0°`,sign);
+  await page.locator('#start').click();
+  await page.waitForFunction(sign => Math.abs(Number(document.querySelector('#platform').dataset.gameAngle) - sign*15)<.02,sign);
+  const before=await page.locator('#egg').evaluate(e=>Number.parseFloat(e.style.left));
+  await page.waitForFunction(({sign,before})=> (Number.parseFloat(document.querySelector('#egg').style.left)-before)*sign > 25,{sign,before});
+  await page.screenshot({path:resolve(site,`../test-results/seesaw-gain3-${sign}.png`)});
+  await page.locator('#result').waitFor({state:'visible',timeout:15000});
+  const trial=await page.evaluate(()=>JSON.parse(localStorage.getItem('keep-the-egg:last-trial')));
+  assert.equal(trial.summary.dropCount,1);
+  assert.ok(trial.summary.survivalTime > 6 && trial.summary.survivalTime < 8);
+  assert.ok(trial.samples.some(s=>Math.abs(s.gameAngle-sign*15)<.02 && Math.abs(s.relativeSensorAngle-sign*5)<.01));
+  assert.ok(trial.samples.some(s=>s.eggPosition*sign>.9));
+  console.log('BROWSER PC FALL', {angle:sign*5,gain:3,seconds:trial.summary.survivalTime,drops:trial.summary.dropCount});
+  await page.locator('#research summary').click();
+  const download=page.waitForEvent('download');await page.locator('#samples-csv').click();
+  const csv=await readFile(await (await download).path(),'utf8');
+  assert.match(csv,/"rawSensorAngle","relativeSensorAngle","gameAngle","angleGain","maxGameAngle","boardLength","objectResponse"/);
+  const summaryDownload=page.waitForEvent('download');await page.locator('#summary-csv').click();
+  const summaryCSV=await readFile(await (await summaryDownload).path(),'utf8');
+  assert.match(summaryCSV,/"initialDeviceTuning"/);
+  assert.ok(!summaryCSV.includes('[object Object]'));
+  page.once('dialog',d=>d.accept());await page.locator('#result-new-participant').click();
+  assert.equal(await page.locator('#tuning-angleGain').inputValue(),'3');
+  await page.reload();await page.waitForFunction(()=>document.body.dataset.appReady==='true');
+  assert.equal(await page.locator('#tuning-angleGain').inputValue(),'3');
+  assert.deepEqual(errors,[]);
+});
+
+test('seesaw staff live clamp/length/response, narrow layout, storage and reset',async t=>{
+  const {page,errors}=await pageFor(t);
+  await launch(page,'seesaw');await page.locator('#mode').selectOption('test');await page.locator('#center').click();
+  await page.locator('#device-tuning summary').click();
+  await page.locator('#tuning-angleGain').fill('3');await page.locator('#tuning-maxGameAngle').fill('10');
+  await page.locator('#tuning-boardLength').fill('70');await page.locator('#tuning-objectResponse').fill('2');
+  await page.locator('#tilt').fill('5');await page.locator('#start').click();
+  await page.waitForFunction(()=>document.body.dataset.phase==='play');
+  await page.locator('#pause').click();
+  assert.equal(await page.locator('#tuning-live-game').textContent(),'+10.0°');
+  for(const length of [70,100,130]){
+    await page.locator('#tuning-boardLength').fill(String(length));
+    const g=await page.evaluate(()=>({scene:document.querySelector('#scene').clientWidth,board:parseFloat(document.querySelector('#platform').style.width)}));
+    assert.ok(Math.abs(g.board-g.scene*.7*length/100)<.01);
+  }
+  await page.locator('#tuning-maxGameAngle').fill('35');
+  await page.waitForFunction(()=>document.querySelector('#tuning-live-game').textContent==='+15.0°');
+  assert.equal(await page.locator('#platform').getAttribute('data-game-angle'),'15');
+  await page.setViewportSize({width:390,height:844});
+  const range=page.locator('#tuning-angleGain');await range.focus();await range.press('ArrowRight');
+  assert.equal(await page.locator('#tilt').inputValue(),'5');
+  await page.waitForFunction(()=>document.querySelector('#tuning-live-game').textContent==='+15.5°');
+  await page.screenshot({path:resolve(site,'../test-results/seesaw-tuning-narrow.png'),fullPage:true});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  await page.reload();await page.waitForFunction(()=>document.body.dataset.appReady==='true');
+  for(const [key,value]of Object.entries({angleGain:'3.1',maxGameAngle:'35',boardLength:'130',objectResponse:'2'}))assert.equal(await page.locator('#tuning-'+key).inputValue(),value);
+  await page.locator('#device-tuning summary').click();await page.locator('#tuning-reset').click();
+  for(const [key,value]of Object.entries({angleGain:'1',maxGameAngle:'30',boardLength:'100',objectResponse:'1'}))assert.equal(await page.locator('#tuning-'+key).inputValue(),value);
+  assert.deepEqual(errors,[]);
+});
+
+test('PHONE CONTROLLER UI/packet regression: host-only gain, remote center, live trial, disconnect/reconnect',async t=>{
+  const context=await browser.newContext({viewport:{width:1600,height:1000}});
+  await context.route('**/vendor/peerjs-1.5.5.min.js',r=>r.fulfill({path:resolve(import.meta.dirname,'fixtures/local-peer.js'),contentType:'text/javascript'}));
+  const host=await context.newPage(),errors=[];
+  let phone;
+  t.after(async()=>{
+    if (!host.isClosed()) console.log('PHONE HOST STATE',await host.evaluate(()=>({hidden:document.hidden,phase:document.body.dataset.phase,status:document.querySelector('#status').textContent,pause:document.querySelector('#pause-reason').textContent,connection:document.querySelector('#connection-state').textContent})));
+    if (phone && !phone.isDetached()) console.log('PHONE CONTROLLER STATE',await phone.evaluate(()=>({hidden:document.hidden,status:document.querySelector('#controller-sensor-state').textContent,host:document.querySelector('#controller-host-state').textContent})));
+    await context.close();
+  });
+  host.on('pageerror',e=>errors.push(e.message));
+  await host.goto(base+'games/seesaw/index.html');
+  await host.waitForFunction(()=>document.body.dataset.appReady==='true');
+  const link=await host.locator('#controller-link').getAttribute('href');
+  // Keep both device UIs visible at once. A background headless tab can legitimately
+  // throttle RAF >500ms and trigger the game's existing safety pause/countdown reset.
+  await host.evaluate(url=>{
+    document.querySelector('#host-app').style.margin='0';
+    document.querySelector('#host-app').style.width='calc(100vw - 420px)';
+    const iframe=document.createElement('iframe');iframe.id='controller-fixture';iframe.src=url;
+    iframe.style.cssText='position:fixed;right:0;top:0;width:400px;height:100vh;border:0;z-index:10000';
+    document.body.append(iframe);
+  },link+'&controllerTest=1');
+  phone=await (await host.locator('#controller-fixture').elementHandle()).contentFrame();
+  await phone.waitForLoadState('domcontentloaded');
+  await phone.locator('#controller-enable').click();await phone.locator('#controller-center').click();
+  await host.waitForFunction(()=>!document.querySelector('#start').disabled);
+  await host.locator('#device-tuning summary').click();await host.locator('#tuning-angleGain').fill('3');
+  await phone.locator('#controller-test-tilt').fill('5');
+  await host.waitForFunction(()=>document.querySelector('#tuning-live-game').textContent==='+15.0°');
+  assert.equal(await phone.locator('#controller-gauge').getAttribute('aria-valuenow'),'5');
+  await host.locator('#phone-center').click();
+  await host.waitForFunction(()=>document.querySelector('#tuning-live-game').textContent==='+0.0°');
+  await phone.locator('#controller-test-tilt').fill('0');
+  await host.waitForFunction(()=>document.querySelector('#tuning-live-game').textContent==='-15.0°');
+  await phone.locator('#controller-center').click();
+  await host.waitForFunction(()=>document.querySelector('#tuning-live-game').textContent==='+0.0°');
+  await host.locator('[data-game-mode="SURVIVAL"]').click();await host.locator('#play-duration').fill('30');
+  await host.locator('#start').click();await host.waitForFunction(()=>document.body.dataset.phase==='play');
+  await phone.locator('#controller-test-tilt').fill('5');
+  await host.waitForFunction(()=>Math.abs(Number(document.querySelector('#platform').dataset.gameAngle)-15)<.02);
+  await host.locator('#phone-retry').evaluate(b=>b.click());
+  await host.locator('#pause-panel').waitFor({state:'visible'});
+  await phone.locator('#controller-retry').click();
+  await host.waitForFunction(()=>document.querySelector('#connection-state').textContent.includes('スマホ接続中'));
+  assert.deepEqual(errors,[]);
+});
+
+test('LOCAL TILT gain and screen rotation safety; KEEP/STAR and sound controls remain usable',async t=>{
+  const {page,errors}=await pageFor(t);
+  await launch(page,'seesaw');
+  await page.locator('#mode').selectOption('sensor');await page.locator('#connect').click();
+  await page.evaluate(()=>{
+    window.simAngle=0;
+    window.sensorFixture=setInterval(()=>window.dispatchEvent(new DeviceOrientationEvent('deviceorientation',{beta:0,gamma:window.simAngle})),34);
+  });
+  await page.locator('#center').click();await page.locator('#device-tuning summary').click();
+  await page.locator('#tuning-angleGain').fill('3');await page.evaluate(()=>{window.simAngle=5;});
+  await page.waitForFunction(()=>document.querySelector('#tuning-live-game').textContent==='+15.0°');
+  await page.locator('#start').click();await page.waitForFunction(()=>document.body.dataset.phase==='play');
+  await page.evaluate(()=>screen.orientation.dispatchEvent(new Event('change')));
+  await page.locator('#pause-panel').waitFor({state:'visible'});
+  assert.match(await page.locator('#pause-reason').textContent(),/向き/);
+  await page.locator('#quit').click();await page.evaluate(()=>clearInterval(window.sensorFixture));
+  await page.locator('#mode').selectOption('test');await page.locator('#center').click();
+  await page.locator('#tuning-reset').click();
+  await page.locator('#staff summary').click();
+  await page.locator('#audio-alert').selectOption('bell');await page.locator('#audio-test').click();
+  await page.locator('#audio-effects').uncheck();await page.locator('#audio-voice').uncheck();
+  await page.locator('#play-duration').fill('5');
+  for(const mode of ['KEEP','STAR']){
+    await page.locator(`[data-game-mode="${mode}"]`).click();
+    await page.locator('#start').click();await page.locator('#result').waitFor({state:'visible',timeout:15000});
+    const trial=await page.evaluate(()=>JSON.parse(localStorage.getItem('keep-the-egg:last-trial')));
+    assert.equal(trial.summary.gameMode,mode);assert.equal(trial.summary.dropCount,0);
+    if(mode==='STAR')assert.equal(trial.summary.starCount,2);
+    await page.locator('#again').click();await page.locator('#center').click();
+  }
+  assert.deepEqual(errors,[]);
 });
