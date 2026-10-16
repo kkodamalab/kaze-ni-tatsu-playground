@@ -266,21 +266,25 @@ test("wind-tree PC DEMO and original PHOTO GIFT selection/download/erase", async
       "browser-test",
     );
     window.photoFixture = { session, ui: new PhotoUI(session) };
+    const {getSharedGift}=await import('../../shared/photo-gift.js');
+    document.querySelector('#app').classList.add('hidden');
+    await getSharedGift().open({session,result:{growth:.5},hasConsent:true,onBack(){},onNext(){}});
   });
-  await page.locator("#photoGrid button").click();
-  await page.locator("#choosePhotoBtn").click();
+  await page.locator("#gift-photo-list button").click();
+  await page.waitForFunction(()=>photoFixture.session.selectedId!==null);
   assert.equal(
     await page.evaluate(() => photoFixture.session.getSelectedGift().blob.type),
     "image/jpeg",
   );
   const downloaded = page.waitForEvent("download");
-  await page.locator("#savePhotoBtn").click();
+  await page.locator("#gift-format").selectOption("jpeg");
+  await page.locator("#gift-save").click();
   assert.match(
     (await downloaded).suggestedFilename(),
-    /wind-tree-browser-test-.*\.jpg/,
+    /kaze-ni-tatsu-.*\.jpg/,
   );
-  await page.locator("#deletePhotoBtn").click();
-  assert.equal(await page.locator("#photoGrid button").count(), 0);
+  await page.locator("#gift-discard").click();
+  assert.equal(await page.locator("#gift-photo-list button").count(), 0);
   assert.equal(
     await page.evaluate(() => photoFixture.session.getSelectedGift()),
     null,
@@ -315,18 +319,22 @@ test("lab PHOTO GIFT retains selection and clears participant photos", async (t)
     lab.play.photoUI.render();
     lab.$("#labResult").hidden = false;
   });
-  await page.locator("#lab-photoGrid button").click();
-  await page.locator("#lab-choosePhotoBtn").click();
+  await page.locator("#labPhotoConsent").check();
+  await page.locator("#labGiftOpen").click();
+  await page.locator("#gift-photo-list button").click();
+  await page.waitForFunction(()=>labFixture.play.photos.selectedId!==null);
   assert.equal(
     await page.evaluate(() => labFixture.getSelectedGift().blob.type),
     "image/jpeg",
   );
   const downloaded = page.waitForEvent("download");
-  await page.locator("#lab-savePhotoBtn").click();
+  await page.locator("#gift-format").selectOption("jpeg");
+  await page.locator("#gift-save").click();
   assert.match(
     (await downloaded).suggestedFilename(),
-    /wind-tree-lab-browser-test/,
+    /kaze-ni-tatsu-.*\.jpg/,
   );
+  await page.locator("#gift-back").click();
   await page.locator("#labResetPlay").click();
   assert.equal(await page.evaluate(() => labFixture.getSelectedGift()), null);
   assert.equal(await page.locator("#lab-photoGrid button").count(), 0);
@@ -361,6 +369,7 @@ test("seesaw PC trial, PHOTO GIFT PNG export and next participant", async (t) =>
   await page.waitForFunction(
     () => document.querySelector("#gift-file-smile").files.length === 0,
   );
+  await page.locator("#gift-options-details > summary").click();
   await page.locator("#gift-layout").selectOption("D");
   const downloaded = page.waitForEvent("download");
   await page.locator("#gift-save").click();
@@ -379,7 +388,7 @@ test("seesaw PC trial, PHOTO GIFT PNG export and next participant", async (t) =>
 
 test("continuous flow, random recycling and DIRECT HAND TEST move actual particles in every mode", async (t) => {
   const { page, errors } = await pageFor(t);
-  await page.route("**/games/wind-tree/app.js", async (route) => {
+  await page.route("**/games/wind-tree/app.js*", async (route) => {
     const source = await readFile(
       resolve(site, "games/wind-tree/app.js"),
       "utf8",
@@ -493,7 +502,7 @@ test("CAMERA ON uses real asynchronous PosePipeline with synthetic upper/full Po
   page.on("worker", (w) => {
     if (w.url().endsWith("pose-worker.js")) workers++;
   });
-  await page.route("**/games/wind-tree/app.js", async (route) => {
+  await page.route("**/games/wind-tree/app.js*", async (route) => {
     const source = await readFile(
       resolve(site, "games/wind-tree/app.js"),
       "utf8",
@@ -693,6 +702,9 @@ for (const sign of [-1, 1]) test(`seesaw actual PC TEST ${sign * 5}deg gain3 dis
   assert.match(summaryCSV,/"initialDeviceTuning"/);
   assert.ok(!summaryCSV.includes('[object Object]'));
   page.once('dialog',d=>d.accept());await page.locator('#result-new-participant').click();
+  await page.waitForURL(base+'index.html');
+  await page.goto(base+'games/seesaw/index.html');
+  await page.waitForFunction(()=>document.body.dataset.appReady==='true');
   assert.equal(await page.locator('#tuning-angleGain').inputValue(),'3');
   await page.reload();await page.waitForFunction(()=>document.body.dataset.appReady==='true');
   assert.equal(await page.locator('#tuning-angleGain').inputValue(),'3');
@@ -732,6 +744,9 @@ test('seesaw staff live clamp/length/response, narrow layout, storage and reset'
 
 test('PHONE CONTROLLER UI/packet regression: host-only gain, remote center, live trial, disconnect/reconnect',async t=>{
   const context=await browser.newContext({viewport:{width:1600,height:1000}});
+  await context.addInitScript(()=>{window.phoneCameraCalls=0;const get=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);navigator.mediaDevices.getUserMedia=async options=>{phoneCameraCalls++;return get(options);};});
+  const runtime=await readFile(resolve(import.meta.dirname,'fixtures/vision-smile.js'),'utf8');
+  await context.route('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@**',r=>r.fulfill({body:runtime,contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
   await context.route('**/vendor/peerjs-1.5.5.min.js',r=>r.fulfill({path:resolve(import.meta.dirname,'fixtures/local-peer.js'),contentType:'text/javascript'}));
   const host=await context.newPage(),errors=[];
   let phone;
@@ -767,10 +782,13 @@ test('PHONE CONTROLLER UI/packet regression: host-only gain, remote center, live
   await host.waitForFunction(()=>document.querySelector('#tuning-live-game').textContent==='-15.0°');
   await phone.locator('#controller-center').click();
   await host.waitForFunction(()=>document.querySelector('#tuning-live-game').textContent==='+0.0°');
+  await host.locator('#shared-photo-panel > summary').click();await host.locator('#photoConsent').check();
   await host.locator('[data-game-mode="SURVIVAL"]').click();await host.locator('#play-duration').fill('30');
   await host.locator('#start').click();await host.waitForFunction(()=>document.body.dataset.phase==='play');
   await phone.locator('#controller-test-tilt').fill('5');
   await host.waitForFunction(()=>Math.abs(Number(document.querySelector('#platform').dataset.gameAngle)-15)<.02);
+  await host.waitForFunction(()=>document.querySelector('.shared-capture-status').textContent.includes('写真 1/5'));
+  assert.equal(await host.evaluate(()=>phoneCameraCalls),1);assert.equal(await phone.evaluate(()=>phoneCameraCalls),0);
   await host.locator('#phone-retry').evaluate(b=>b.click());
   await host.locator('#pause-panel').waitFor({state:'visible'});
   await phone.locator('#controller-retry').click();
@@ -809,4 +827,154 @@ test('LOCAL TILT gain and screen rotation safety; KEEP/STAR and sound controls r
     await page.locator('#again').click();await page.locator('#center').click();
   }
   assert.deepEqual(errors,[]);
+});
+
+async function auditCapture(page) {
+  await page.addInitScript(()=>{
+    window.cameraCalls=0;window.captureTracks=[];window.workerRecords=[];window.liveObjectURLs=new Set();
+    const get=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia=async options=>{window.cameraCalls++;const stream=await get(options);window.captureTracks.push(...stream.getTracks());return stream;};
+    const NativeWorker=window.Worker;
+    window.Worker=class extends NativeWorker{constructor(...args){super(...args);const record={url:String(args[0]),closed:false};window.workerRecords.push(record);const terminate=this.terminate.bind(this);this.terminate=()=>{record.closed=true;return terminate();};}};
+    const create=URL.createObjectURL.bind(URL),revoke=URL.revokeObjectURL.bind(URL);
+    URL.createObjectURL=value=>{const url=create(value);window.liveObjectURLs.add(url);return url;};URL.revokeObjectURL=url=>{window.liveObjectURLs.delete(url);revoke(url);};
+  });
+  const runtime=await readFile(resolve(import.meta.dirname,'fixtures/vision-smile.js'),'utf8');
+  await page.route('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@**',r=>r.fulfill({body:runtime,contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
+  await page.route('**/games/seesaw/src/app.js*',async r=>r.fulfill({body:await readFile(resolve(site,'games/seesaw/src/app.js'),'utf8')+'\nwindow.sharedAudit={get photos(){return sharedCapture.photos},get face(){return sharedCapture.face}};',contentType:'text/javascript'}));
+  await page.route('**/games/wind-tree/app.js*',async r=>r.fulfill({body:await readFile(resolve(site,'games/wind-tree/app.js'),'utf8')+'\nwindow.sharedAudit={get photos(){return photos},get face(){return faceCapture}};',contentType:'text/javascript'}));
+}
+
+for(const game of ['seesaw','wind-tree'])test(`shared smile shutter, common gallery/editor/JPEG/PNG/drawing and complete participant cleanup: ${game}`,async t=>{
+  const {page,errors}=await pageFor(t);await auditCapture(page);await launch(page,game);
+  if(game==='seesaw'){
+    await page.locator('#mode').selectOption('test');await page.locator('#center').click();await page.locator('#play-duration').fill('10');await page.locator('#shared-photo-panel > summary').click();
+  }else{await page.locator('#durationNumber').fill('8');await page.locator('#homeDetails > summary').click();}
+  assert.equal(await page.locator('#smileThreshold').inputValue(),'60');
+  assert.equal(await page.locator('[data-setting=maxPhotos]').inputValue(),'5');
+  await page.locator('[data-setting=maxPhotos]').fill('2');await page.locator('#photoConsent').check();
+  await page.locator(game==='seesaw'?'#start':'#startBtn').click();
+  await page.waitForFunction(()=>sharedAudit.photos.photos.length===2,{},{timeout:20000});
+  await page.locator(game==='seesaw'?'#result':'#finish').waitFor({state:'visible',timeout:15000});
+  assert.equal(await page.evaluate(()=>cameraCalls),1,'Face must reuse Pose video or acquire one host camera only');
+  const capture=await page.evaluate(()=>({photos:sharedAudit.photos.photos.map(p=>({elapsed:p.elapsedSec,score:p.smileScore})),workers:workerRecords,tracks:captureTracks.map(t=>t.readyState)}));
+  assert.equal(capture.photos.length,2);assert.ok(capture.photos[1].elapsed-capture.photos[0].elapsed>=3);assert.ok(capture.photos.every(p=>p.score>=.6));assert.ok(capture.workers.every(w=>w.closed));assert.ok(capture.tracks.every(s=>s==='ended'));
+  await page.locator(game==='seesaw'?'#gift-open':'#wind-gift-open').click();
+  assert.equal(await page.locator('#gift-photo-list button').count(),2);
+  await page.locator('#gift-photo-list button').first().click();
+  await page.waitForFunction(()=>document.querySelector('#gift-photo-list button').getAttribute('aria-pressed')==='true');
+  await page.locator('#gift-options-details > summary').click();
+  await page.locator('#gift-layout').selectOption('D');await page.locator('#gift-zoom-smile').fill('2');await page.locator('#gift-x-smile').fill('0.5');await page.locator('#gift-frame').selectOption('nature');
+  await page.locator('#gift-event-details > summary').click();
+  await page.locator('#gift-event-name').fill('風に立つ テスト');await page.locator('#gift-event-date').fill('2026-10-18');await page.locator('#gift-event-location').fill('テスト会場');
+  await page.waitForFunction(()=>!document.querySelector('#gift-save').disabled);
+  const before=await page.locator('#gift-canvas').evaluate(c=>c.toDataURL());
+  await page.locator('#gift-drawing-details > summary').click();
+  await page.locator('#gift-draw-enabled').check();await page.locator('#gift-draw-layer').scrollIntoViewIfNeeded();
+  const b=await page.locator('#gift-draw-layer').boundingBox();await page.mouse.move(b.x+b.width*.5,b.y+b.height*.5);await page.mouse.down();await page.mouse.move(b.x+b.width*.6,b.y+b.height*.5+40,{steps:5});await page.mouse.up();
+  await page.waitForFunction(()=>!document.querySelector('#gift-save').disabled);
+  assert.notEqual(await page.locator('#gift-canvas').evaluate(c=>c.toDataURL()),before);
+  for(const format of ['png','jpeg']){
+    await page.locator('#gift-format').selectOption(format);const download=page.waitForEvent('download');await page.locator('#gift-save').click();const saved=await download;const bytes=await readFile(await saved.path());
+    if(format==='png')assert.deepEqual([...bytes.subarray(0,8)],[137,80,78,71,13,10,26,10]);else assert.deepEqual([...bytes.subarray(0,2)],[255,216]);
+  }
+  for(const width of [1440,768,390]){await page.setViewportSize({width,height:1000});await page.screenshot({path:resolve(site,`../test-results/shared-gift-${game}-${width}.png`),fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));}
+  assert.equal(await page.evaluate(()=>Object.values(localStorage).some(v=>/data:image|blob:/.test(v))),false);
+  await page.waitForFunction(()=>liveObjectURLs.size===2);
+  let cleanup;
+  page.on('console',m=>{if(m.text().startsWith('PHOTO_CLEANUP '))cleanup=JSON.parse(m.text().slice(14));});
+  await page.evaluate(()=>addEventListener('pagehide',()=>console.log('PHOTO_CLEANUP '+JSON.stringify({photos:sharedAudit.photos.photos.length,urls:liveObjectURLs.size,workers:workerRecords.every(w=>w.closed),tracks:captureTracks.every(t=>t.readyState==='ended')}))));
+  if(game==='seesaw')page.once('dialog',d=>d.accept());
+  await page.locator('#new-participant').click();await page.waitForURL(base+'index.html');
+  assert.deepEqual(cleanup,{photos:0,urls:0,workers:true,tracks:true});
+  await page.goto(base+`games/${game}/index.html`);await page.locator('#photoConsent').waitFor({state:'attached'});
+  assert.equal(await page.locator('#photoConsent').isChecked(),false);assert.equal(await page.evaluate(()=>sharedAudit.photos.photos.length),0);
+  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('playground:photo-settings')).eventName),'風に立つ テスト');
+  assert.deepEqual(errors,[]);
+});
+
+test('seesaw BODY shares one camera between Pose and Face and consent revocation stops capture',async t=>{
+  const {page,errors}=await pageFor(t);await auditCapture(page);await launch(page,'seesaw');
+  await page.locator('#mode').selectOption('body');await page.locator('#connect').click();await page.locator('#center').click();
+  await page.locator('#shared-photo-panel > summary').click();await page.locator('#photoConsent').check();await page.locator('#play-duration').fill('15');await page.locator('#start').click();
+  await page.waitForFunction(()=>sharedAudit.photos.photos.length>0,{},{timeout:15000});
+  assert.equal(await page.evaluate(()=>cameraCalls),1);
+  await page.locator('#photoConsent').uncheck();
+  assert.equal(await page.evaluate(()=>sharedAudit.photos.photos.length),0);
+  assert.ok(await page.evaluate(()=>workerRecords.filter(w=>w.url.includes('face-worker')).every(w=>w.closed)));
+  assert.ok(await page.evaluate(()=>captureTracks.some(t=>t.readyState==='live')),'BODY Pose keeps its shared camera while playing without photos');
+  await page.locator('#pause').click();await page.locator('#quit').click();await page.locator('#mode').selectOption('test');
+  assert.ok(await page.evaluate(()=>captureTracks.every(t=>t.readyState==='ended')));
+  assert.deepEqual(errors,[]);
+});
+
+test('no consent never starts Face/camera; camera denial falls back without blocking either game',async t=>{
+  for(const game of ['seesaw','wind-tree']){
+    const {page,errors}=await pageFor(t);await auditCapture(page);
+    await page.addInitScript(()=>{navigator.mediaDevices.getUserMedia=async()=>{window.cameraCalls++;throw new DOMException('Denied','NotAllowedError');};});
+    await launch(page,game);
+    if(game==='seesaw'){await page.locator('#mode').selectOption('test');await page.locator('#center').click();await page.locator('#play-duration').fill('5');}
+    else await page.locator('#durationNumber').fill('1');
+    await page.locator(game==='seesaw'?'#start':'#startBtn').click();await page.locator(game==='seesaw'?'#result':'#finish').waitFor({state:'visible',timeout:15000});
+    assert.equal(await page.evaluate(()=>sharedAudit.photos.photos.length),0);assert.ok(await page.evaluate(()=>workerRecords.every(w=>!w.url.includes('face-worker'))));
+    if(game==='seesaw')assert.equal(await page.evaluate(()=>cameraCalls),0);
+    else assert.match(await page.locator('#photoStatus').textContent(),/PCテスト/);
+    assert.deepEqual(errors,[]);
+  }
+});
+
+test('shared QR transfer authenticates, retries, delivers exact PNG, previews/saves/shares and disposes connections',async t=>{
+  const context=await browser.newContext({viewport:{width:1800,height:1100}});t.after(()=>context.close());
+  await context.route('**/vendor/peerjs-1.5.5.min.js',r=>r.fulfill({path:resolve(import.meta.dirname,'fixtures/local-peer.js'),contentType:'text/javascript'}));
+  await context.addInitScript(()=>{Object.defineProperty(navigator,'canShare',{value:()=>true,configurable:true});Object.defineProperty(navigator,'share',{value:async({files})=>{window.sharedFiles=files.map(f=>({type:f.type,size:f.size}));},configurable:true});});
+  const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await launch(page,'seesaw');await page.locator('#mode').selectOption('test');await page.locator('#center').click();await page.locator('#play-duration').fill('5');await page.locator('#start').click();await page.locator('#result').waitFor({state:'visible',timeout:15000});await page.locator('#gift-open').click();
+  await page.locator('#gift-consent').check();await page.locator('#gift-send').click();await page.locator('#gift-link').waitFor({state:'visible'});
+  const url=await page.locator('#gift-link').getAttribute('href'),parsed=new URL(url);
+  assert.equal(parsed.pathname,new URL(base).pathname+'games/seesaw/index.html');assert.deepEqual([...parsed.searchParams.keys()],['gift','token']);assert.equal(parsed.searchParams.get('token').length,64);assert.ok(url.length<400);assert.ok(!url.includes('data:image'));
+  assert.equal(await page.locator('#gift-qr canvas, #gift-qr img').count()>0,true);
+  await page.evaluate(url=>{const frame=document.createElement('iframe');frame.id='gift-receiver-fixture';frame.src=url;frame.style.cssText='position:fixed;right:0;top:0;width:400px;height:100vh;z-index:20000;background:white';document.body.append(frame);},url.replace(parsed.searchParams.get('token'),'b'.repeat(64)));
+  let phone=await(await page.locator('#gift-receiver-fixture').elementHandle()).contentFrame();
+  await phone.waitForFunction(()=>document.querySelector('#receive-status').textContent.includes('中断'));
+  assert.equal(await phone.locator('#receive-save').isVisible(),false);
+  await page.locator('#gift-receiver-fixture').evaluate((frame,url)=>{frame.src=url;},url);
+  phone=await(await page.locator('#gift-receiver-fixture').elementHandle()).contentFrame();
+  await phone.waitForFunction(()=>document.querySelector('#receive-status').textContent.includes('届きました'),{},{timeout:15000});
+  assert.deepEqual(await phone.locator('#receive-image').evaluate(image=>[image.naturalWidth,image.naturalHeight]),[1080,1620]);
+  const received=await phone.locator('#receive-image').evaluate(async image=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await(await fetch(image.src)).arrayBuffer()))));
+  const expected=await page.locator('#gift-canvas').evaluate(async c=>{const b=await new Promise(r=>c.toBlob(r,'image/png'));return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await b.arrayBuffer())));});
+  assert.deepEqual(received,expected);
+  const download=page.waitForEvent('download');await phone.locator('#receive-save').click();assert.match((await download).suggestedFilename(),/\.png$/);
+  await phone.locator('#receive-share').click();assert.equal(await phone.evaluate(()=>sharedFiles[0].type),'image/png');
+  await phone.locator('#receive-discard').click();assert.equal(await phone.locator('#receive-save').isVisible(),false);assert.equal(await phone.locator('#receive-image').getAttribute('src'),null);
+  assert.ok(await phone.evaluate(()=>localPeers.every(p=>p.destroyed)));
+  await page.locator('#gift-transfer-stop').click();
+  assert.ok(await page.evaluate(()=>localPeers.every(p=>p.destroyed)));
+  assert.equal(await page.locator('#gift-link').getAttribute('href'),null);
+  assert.deepEqual(errors,[]);
+});
+
+test('live threshold and capture ON/OFF preserve cooldown, never overlap cameras, and PHOTO GIFT OFF hides entry',async t=>{
+  const {page,errors}=await pageFor(t);await auditCapture(page);await launch(page,'seesaw');
+  await page.locator('#mode').selectOption('test');await page.locator('#center').click();await page.locator('#play-duration').fill('30');await page.locator('#shared-photo-panel > summary').click();
+  await page.locator('#smileThreshold').fill('100');await page.locator('#photoConsent').check();await page.locator('#start').click();
+  await page.waitForFunction(()=>document.body.dataset.phase==='play');await page.waitForTimeout(1300);
+  assert.equal(await page.evaluate(()=>sharedAudit.photos.photos.length),0);
+  await page.locator('#smileThreshold').fill('10');await page.waitForFunction(()=>sharedAudit.photos.photos.length===1,{},{timeout:6000});
+  const first=await page.evaluate(()=>sharedAudit.photos.photos[0].elapsedSec);
+  await page.locator('#smileEnabled').uncheck();assert.ok(await page.evaluate(()=>captureTracks.every(t=>t.readyState==='ended')));assert.equal(await page.evaluate(()=>sharedAudit.photos.photos.length),1);
+  await page.locator('#smileEnabled').check();await page.waitForFunction(()=>sharedAudit.photos.photos.length===2,{},{timeout:8000});
+  assert.ok(await page.evaluate(first=>sharedAudit.photos.photos[1].elapsedSec-first>=3,first));
+  assert.equal(await page.evaluate(()=>cameraCalls),2);assert.equal(await page.evaluate(()=>captureTracks.filter(t=>t.readyState==='live').length),1);
+  await page.locator('#photoConsent').uncheck();assert.equal(await page.evaluate(()=>sharedAudit.photos.photos.length),0);assert.ok(await page.evaluate(()=>captureTracks.every(t=>t.readyState==='ended')));
+  await page.locator('[data-setting=giftEnabled]').uncheck();assert.equal(await page.locator('#gift-open').evaluate(e=>e.hidden),true);
+  await page.locator('#pause').click();await page.locator('#quit').click();assert.deepEqual(errors,[]);
+});
+
+test('Face model failure releases host camera/worker and the game still finishes with PHOTO GIFT available',async t=>{
+  const {page,errors}=await pageFor(t);await auditCapture(page);
+  await page.route('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@**',r=>r.fulfill({contentType:'text/javascript',headers:{'access-control-allow-origin':'*'},body:"export const FilesetResolver={forVisionTasks:async()=>({})};export const FaceLandmarker={createFromOptions:async()=>{throw Error('synthetic model failure')}};"}));
+  await launch(page,'seesaw');await page.locator('#mode').selectOption('test');await page.locator('#center').click();await page.locator('#play-duration').fill('5');await page.locator('#shared-photo-panel > summary').click();await page.locator('#photoConsent').check();await page.locator('#start').click();
+  await page.waitForFunction(()=>cameraCalls===1&&workerRecords.some(w=>w.url.includes('face-worker'))&&workerRecords.every(w=>w.closed)&&captureTracks.every(t=>t.readyState==='ended'));
+  await page.locator('#result').waitFor({state:'visible',timeout:15000});assert.equal(await page.evaluate(()=>sharedAudit.photos.photos.length),0);assert.equal(await page.locator('#gift-open').isVisible(),true);assert.deepEqual(errors,[]);
 });

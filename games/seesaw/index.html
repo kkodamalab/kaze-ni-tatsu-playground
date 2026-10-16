@@ -2,10 +2,11 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="seesaw-release" content="20261016-device-tuning">
+  <meta name="seesaw-release" content="phase6-shared-photos">
   <meta name="theme-color" content="#f7f5e9"><meta name="apple-mobile-web-app-capable" content="yes">
   <title>シーソーゲーム | 〇〇を落とすな！</title>
-  <link rel="stylesheet" href="./styles.css?v=20261016-device-tuning">
+  <link rel="stylesheet" href="./styles.css?v=phase6-shared-photos">
+  <link rel="stylesheet" href="../../shared/photo.css">
 </head>
 <body>
   <main id="host-app">
@@ -72,9 +73,10 @@
       <div id="start-countdown" class="start-countdown" role="status" aria-live="assertive" hidden><strong id="countdown-number">3</strong><p>まんなかで、じゅんび！</p></div>
       <div id="pause-panel" class="pause-panel" hidden><h2>ひとやすみ</h2><p id="pause-reason">準備ができたら、つづけよう。</p><button id="resume" class="primary">つづける</button><button id="reset-center" class="secondary">まんなかにして つづける</button><button id="quit" class="quiet">はじめにもどる</button></div>
     </section>
-    <section id="result" hidden><div id="result-object" class="result-object"></div><div id="celebration" class="celebration">✦ ✦ ✦</div><span class="eyebrow">よく がんばったね</span><h1 id="result-title">できた！</h1><p class="result-stars"><span id="total-stars">0</span></p><p id="result-message">よく がんばったね。</p><button id="again" class="primary">もういっかい ↻</button><button id="other-game" class="secondary">べつのゲーム</button><button id="gift-open" class="secondary">おみやげフォトをつくる</button><button id="result-new-participant" class="secondary participant-button">次の参加者</button><p class="participant-help">写真・作品・個人データを削除して最初に戻ります</p><div id="result-leaves" class="leaf-pile" aria-hidden="true" hidden></div><details id="research"><summary>おとなの方へ · 研究用データ</summary><p id="storage-note"></p><pre id="metrics"></pre><button id="samples-csv" class="secondary">記録CSV</button><button id="summary-csv" class="secondary">集計CSV</button></details></section>
-    <section id="gift" hidden><h1>おみやげフォト</h1><div id="gift-editor"></div><canvas id="gift-canvas" width="1080" height="1620"></canvas><p id="gift-status" role="status"></p><button id="gift-save" class="primary">PNGを保存</button><button id="gift-send" class="secondary">スマホにおくる</button><p id="gift-transfer-status" role="status"></p><section id="gift-transfer" hidden><h2>写真を受け取るQR</h2><div id="gift-qr"></div><a id="gift-link" target="_blank" rel="noopener"></a><p>PCを開いたまま受信してください。10分間有効。通信できない場合はPCのPNG保存を使えます。</p><button id="gift-transfer-stop" class="quiet">転送終了・一時データを破棄</button></section><button id="gift-back" class="secondary">結果にもどる</button><button id="gift-discard" class="quiet">写真・作品を消す</button><button id="new-participant" class="secondary participant-button">次の参加者</button><p class="participant-help">写真・作品・個人データを削除して最初に戻ります</p></section>
+    <section id="result" hidden><div id="result-object" class="result-object"></div><div id="celebration" class="celebration">✦ ✦ ✦</div><span class="eyebrow">よく がんばったね</span><h1 id="result-title">できた！</h1><p class="result-stars"><span id="total-stars">0</span></p><p id="result-message">よく がんばったね。</p><button id="again" class="primary">もういっかい ↻</button><button id="other-game" class="secondary">べつのゲーム</button><button id="gift-open" class="secondary">おみやげ写真をつくる？</button><button id="result-new-participant" class="secondary participant-button">次の参加者</button><p class="participant-help">写真・作品・個人データを削除して最初に戻ります</p><div id="result-leaves" class="leaf-pile" aria-hidden="true" hidden></div><details id="research"><summary>おとなの方へ · 研究用データ</summary><p id="storage-note"></p><pre id="metrics"></pre><button id="samples-csv" class="secondary">記録CSV</button><button id="summary-csv" class="secondary">集計CSV</button></details></section>
+    <section id="gift" hidden></section>
     <aside id="body-preview" hidden><div class="camera-view"><video id="body-video" autoplay muted playsinline></video><canvas id="body-overlay"></canvas></div><p>肩と腰をカメラにうつしてね</p></aside>
+    <details id="shared-photo-panel"><summary>写真設定 · 笑顔シャッター／PHOTO GIFT</summary><div id="shared-photo-settings"></div></details>
     <aside id="test-controls" hidden><label for="tilt">PC Test Mode <output id="tilt-value">0°</output></label><input id="tilt" type="range" min="-30" max="30" step="1" value="0"><p>← 左へ　→ 右へ　Space まっすぐ</p></aside>
     <details id="device-tuning">
       <summary>スタッフ用設定 · 実機調整</summary>
@@ -104,9 +106,9 @@
     <button id="controller-retry" class="quiet">PCにつなぎ直す</button>
     <aside id="controller-test" hidden><strong>開発用・模擬センサー入力</strong><p>実センサーではありません。PCにも模擬入力として記録します。</p><label for="controller-test-tilt">模擬傾き</label><input id="controller-test-tilt" type="range" min="-30" max="30" step="1" value="0"></aside>
   </main>
-  <main id="gift-receiver" hidden><span class="eyebrow">PHOTO GIFT</span><h1>おみやげフォトを受け取る</h1><p id="receive-status" role="status">写真のPCにつないでいます…</p><img id="receive-image" alt="風に立つ 記念フォト"><a id="receive-save" class="primary" download="kaze-ni-tatsu-2026-10-18.png" hidden>写真を保存</a><button id="receive-share" class="secondary" hidden>共有・写真に保存</button><p>iPhoneで保存できないときは、画像を長押しして「写真に保存」を選んでください。Androidは「写真を保存」からダウンロードできます。</p><button id="receive-retry" class="secondary">再試行</button><button id="receive-discard" class="quiet">受信写真・接続を破棄</button></main>
+  <main id="gift-receiver" hidden><span class="eyebrow">PHOTO GIFT</span><h1>おみやげフォトを受け取る</h1><p id="receive-status" role="status">写真のPCにつないでいます…</p><img id="receive-image" alt="風に立つ 記念フォト"><a id="receive-save" class="primary" download="kaze-ni-tatsu.png" hidden>写真を保存</a><button id="receive-share" class="secondary" hidden>共有・写真に保存</button><p>iPhoneで保存できないときは、画像を長押しして「写真に保存」を選んでください。Androidは「写真を保存」からダウンロードできます。</p><button id="receive-retry" class="secondary">再試行</button><button id="receive-discard" class="quiet">受信写真・接続を破棄</button></main>
   <script src="./vendor/peerjs-1.5.5.min.js"></script>
   <script src="./vendor/qrcode-1.0.0.min.js"></script>
-  <script type="module" src="./src/bootstrap.js?v=20261016-device-tuning"></script>
+  <script type="module" src="./src/bootstrap.js?v=phase6-shared-photos"></script>
 <script type="module" src="./playground-session.js"></script></body>
 </html>

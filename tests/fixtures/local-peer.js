@@ -20,7 +20,7 @@ class LocalConnection extends Events {
 }
 window.Peer = class LocalPeer extends Events {
   constructor(id) {
-    super(); this.id = typeof id === 'string' ? id : crypto.randomUUID();
+    super(); (window.localPeers ??= []).push(this); this.id = typeof id === 'string' ? id : crypto.randomUUID();
     this.connections = {}; this.open = false; this.destroyed = false;
     this.channel = new BroadcastChannel('seesaw-browser-test');
     this.channel.onmessage = ({data}) => {

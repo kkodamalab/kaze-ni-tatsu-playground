@@ -53,7 +53,7 @@ export class BodyCamera {
       const files = await FilesetResolver.forVisionTasks(`${poseRoot}/wasm`);
       detector = await PoseLandmarker.createFromOptions(files, { baseOptions: { modelAssetPath: poseModel }, runningMode: 'VIDEO', numPoses: 1 });
       if (generation !== this.generation) { detector.close(); stream.getTracks().forEach(t => t.stop()); return; }
-      this.detector = detector; this.lastTime = -1;
+      this.detector = detector; this.lastTime = -1; this.lastInference = -Infinity;
       this.tick(generation);
     } catch (error) {
       stream?.getTracks().forEach(t => t.stop()); detector?.close();
@@ -64,7 +64,7 @@ export class BodyCamera {
   tick(generation) {
     if (generation !== this.generation) return;
     try {
-      if (this.video.readyState >= 2 && this.video.currentTime !== this.lastTime) {
+      if (this.video.readyState >= 2 && this.video.currentTime !== this.lastTime && performance.now() - this.lastInference >= 33) {
         this.lastTime = this.video.currentTime;
         const now = performance.now();
         const result = this.detector.detectForVideo(this.video, now);
