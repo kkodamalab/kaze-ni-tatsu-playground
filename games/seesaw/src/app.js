@@ -2,14 +2,17 @@ import { sceneGeometry, rollingAngle } from './geometry.js?v=20261016-device-tun
 import { config, objects, gameModes, isImageObject } from './config.js?v=20261009-ui-physics';
 import { VBFInput, TiltInput, clamp } from './input.js?v=20261009-ui-physics';
 import { SeesawGame, toCSV } from './game.js?v=20261016-device-tuning';
-import { BodyInput, BodyCamera } from './body.js?v=20261009-ui-physics';
+import { BodyInput, BodyCamera } from './body.js?v=phase6-shared-photos';
 import { renderObject } from './art.js?v=20261009-ui-physics';
 import { loadImage, drawCrop, saveCanvas } from './images.js?v=20261009-ui-physics';
 import { giftData, drawGift, resultText } from './gift.js?v=20261009-ui-physics';
 import { PhoneHost } from './phone-host.js?v=20261009-ui-physics';
 import { inputFresh, pauseReason } from './safety.js?v=20261009-ui-physics';
 import { GameAudio, phrases } from './audio.js?v=20261009-ui-physics';
-import { GiftEditor } from './gift-editor.js?v=20261009-ui-physics';
+import { getGiftEditor, getSharedGift } from '../../../shared/photo-gift.js';
+import { SharedCaptureSession } from '../../../shared/capture-session.js';
+import { mountPhotoSettings, photoSettings } from '../../../shared/photo-settings.js';
+import { registerCleanup, nextParticipant as goNextParticipant } from '../../../shared/participant.js';
 import { StartCountdown } from './countdown.js?v=20261009-ui-physics';
 import { LeafEffects, leafPile } from './leaves.js?v=20261009-ui-physics';
 import { DeviceTuning, tuneSample } from './device-tuning.js';
@@ -18,7 +21,8 @@ let tuningStorage;
 try { tuningStorage = localStorage; } catch { /* Private browsing can disable storage. */ }
 const deviceTuning = new DeviceTuning(tuningStorage);
 const audio = new GameAudio(globalThis,text => $('audio-status').textContent=text);
-const giftEditor = new GiftEditor(() => discardImages());
+const giftEditor = getGiftEditor(() => discardImages());
+const sharedGift = getSharedGift();
 const countdown=new StartCountdown();
 const leaves=new LeafEffects($('leaf-background'),$('leaf-flights'));
 let countdownLabel='', startBannerUntil=0;
@@ -74,6 +78,13 @@ for (const key of Object.keys(deviceTuning.values)) $('tuning-' + key).addEventL
 });
 $('tuning-reset').onclick = () => { deviceTuning.reset(); changeTuning(deviceTuning.values); };
 syncTuning();
+let sharedCapture;
+const sharedPhotoUI=mountPhotoSettings($('shared-photo-settings'),{
+  onRevoke:(erase=true)=>{sharedCapture?.stop();if(erase){discardImages();sharedGift.clear();stopPhoto();}},
+  onChange:value=>{sharedCapture?.face?.configure(value);if(!value.enabled)sharedCapture?.stop();else if(sharedCapture && phase==='play' && sharedPhotoUI.hasConsent() && !sharedCapture.starting && !sharedCapture.face?.enabled && sharedCapture.photos.photos.length<value.maxPhotos)sharedCapture.begin(mode==='body'?$('body-video'):null,{reset:false});$('gift-open').hidden=!value.giftEnabled;}
+});
+sharedCapture=new SharedCaptureSession({settingsUI:sharedPhotoUI,isPlaying:()=>phase==='play'&&!paused&&!document.hidden,getElapsed:()=>1000*(game?.elapsed||0)});
+registerCleanup(()=>{discardImages();sharedCapture.clear();sharedGift.clear();countdown.cancel();audio.stop();leaves.reset();bodyCamera.disconnect();tiltInput.disconnect();phoneHost.stop();stopPhoto();clearInterval(feedbackTimer);releaseWakeLock();images={};cropSource=null;phase='setup';paused=false;accumulator=0;game=null;});
 const fresh = () => inputFresh(input(), mode, performance.now());
 function show(next) {
   if (phase === 'gift' && next !== 'gift') giftEditor.close();
@@ -82,6 +93,7 @@ function show(next) {
   $('start-countdown').hidden=next!=='countdown';
   for (const name of ['setup', 'play', 'result', 'gift']) $(name).hidden = name !== (next==='countdown'?'play':next);
   $('test-controls').hidden = mode !== 'test' || !['setup','play','countdown'].includes(next);
+  $('shared-photo-panel').hidden = !['setup','play','countdown'].includes(next);
   $('device-tuning').hidden = !['setup','play','countdown'].includes(next);
   updatePreview();
   window.scrollTo(0, 0);
@@ -101,7 +113,8 @@ async function acquireWakeLock() {
 function releaseWakeLock() { const lock = wakeLock; wakeLock = null; lock?.release().catch(() => {}); }
 function pause(reason) {
   if (phase==='countdown') { cancelCountdown(reason); return; }
-  if (phase !== 'play') return;
+  if (phase !== 'play' || !game) return;
+  sharedCapture.pause();
   $('start-countdown').hidden=true; audio.stop(); leaves.active(gameMode==='STAR',true); paused = true; game.paused = true; accumulator = 0; releaseWakeLock();
   $('pause-panel').hidden = false; $('pause-reason').textContent = reason;
   $('reset-center').hidden = !needsCenter || mode === 'phone';
@@ -117,6 +130,7 @@ function resume(recenter = false) {
   acquireWakeLock();
 }
 function prepare() {
+  sharedCapture.clear();sharedGift.clear();sharedPhotoUI.consent.checked=false;
   countdown.cancel(); leaves.reset(); audio.stop(); giftVersion++; game = null; paused = false; releaseWakeLock(); show('setup');
   $('pause-panel').hidden = true;
   $('status').textContent = mode === 'body' ? '① カメラをつかう → ② まんなかにしてね。' : '固定をたしかめて、まんなかにしてね。';
@@ -124,6 +138,7 @@ function prepare() {
   $('research').open = false;
 }
 $('mode').addEventListener('change', () => {
+  sharedCapture.clear();
   connectionVersion++; clearTimeout(connectionTimer); tiltInput.disconnect(); tiltInput.reset(); bodyCamera.disconnect(); stopPhoto();
   phoneHost.stop(); mode = $('mode').value;
   $('phone-connection').hidden = mode !== 'phone'; $('local-preparation').hidden = mode === 'phone';
@@ -173,6 +188,7 @@ $('start').addEventListener('click', () => {
   if (!fresh() || !input().calibrated) { $('status').textContent = '入力を確認して、まんなかを設定してね。'; return; }
   if (isImageObject(objectType) && !images[objectType]) { $('status').textContent = '写真や作品をえらんでね。'; return; }
   const audioReady=audio.unlock(); audio.reset(); stopPhoto(); game = new SeesawGame(difficulty, { gameMode, objectType, inputMode: mode, duration, tuning: deviceTuning.values });
+  sharedCapture.begin(mode === 'body' ? $('body-video') : null);
   renderObject($('egg'),objectType,images[objectType],objectStyle); paused = false; needsCenter = false;
   trialMetadata = { preparedAt: new Date().toISOString(), startedAt: null, inputMode: mode, baselineAngle: input().baselineAngle,
     roomId: mode === 'phone' ? phoneHost.room : null, controllerInputType: mode === 'phone' ? input().inputType : null, controllerCalibrationKey: mode === 'phone' ? phoneHost.calibrationKey() : null, gameMode, objectType, objectStyle, configuredDuration: duration, sensitivity: bodyInput.sensitivity, inputInverted: mode === 'body' && bodyInput.invert, filterAlpha: config.alpha, sampleInterval: config.sampleInterval, difficulty, settings: { ...game.settings }, initialDeviceTuning: {...deviceTuning.values} };
@@ -225,6 +241,7 @@ function render() {
   if ($('message').textContent !== message) $('message').textContent = message;
 }
 function finish() {
+  sharedCapture.stop();
   releaseWakeLock();
   if (mode === 'body') { bodyCamera.disconnect(); $('connect').disabled = false; }
   show('result'); leaves.reset(); leafPile($('result-leaves'),gameMode==='STAR'?game.stars:0); $('celebration').hidden=gameMode==='STAR';
@@ -310,7 +327,7 @@ document.querySelectorAll('[data-game-mode]').forEach(button => button.addEventL
 }));
 $('other-game').addEventListener('click',() => { discardImages(); prepare(); });
 $('result-new-participant').addEventListener('click', nextParticipant);
-$('new-participant').addEventListener('click', nextParticipant);
+
 for (const id of ['preview-visible','preview-mirror']) $(id).addEventListener('change',updatePreview);
 $('skeleton').addEventListener('change',() => { bodyCamera.skeleton = $('skeleton').checked; });
 $('axis-debug').addEventListener('change',() => { bodyCamera.debug = $('axis-debug').checked; });
@@ -333,12 +350,15 @@ function editSource(source,type) {
 }
 $('image-file').addEventListener('change',async () => {
   const file = $('image-file').files[0]; if (!file) return;
+  if(!sharedPhotoUI.hasConsent()){$('image-file').value='';$('image-status').textContent='写真の同意を確認してください。';return;}
   const version = ++imageVersion, type = objectType; stopPhoto();
   try { const source = await loadImage(file); if (version === imageVersion && type === objectType) editSource(source,type); }
   catch (error) { if (version === imageVersion) $('image-status').textContent = error.message || '画像を読み込めませんでした。別の画像を選んでね。'; }
   finally { $('image-file').value = ''; }
 });
 $('photo-camera').addEventListener('click',async () => {
+  if(!sharedPhotoUI.hasConsent()){$('image-status').textContent='写真の同意を確認してください。';return;}
+  sharedCapture.stop();
   stopPhoto(); const version = photoVersion, type = objectType; imageVersion++;
   if (mode === 'body') { connectionVersion++; bodyCamera.disconnect(); }
   try {
@@ -366,9 +386,10 @@ $('use-image').addEventListener('click',() => {
 });
 function nextParticipant() {
   if(!window.confirm('写真や作品をすべて削除して、次の参加者に進みますか？'))return;
-  discardImages();giftEditor.data=null;trialMetadata=null;try{localStorage.removeItem('keep-the-egg:last-trial');}catch{/* Storage may be unavailable; in-memory data is still erased. */}$('metrics').textContent='';$('storage-note').textContent='';chooseObject('EGG');prepare();
+  discardImages();goNextParticipant();
 }
 function discardImages() {
+  sharedCapture?.clear();
   giftEditor.erase(); imageVersion++; giftVersion++; stopPhoto(); images = {}; cropSource = null; cropType = null;
   $('crop-preview').getContext('2d').clearRect(0,0,256,256); $('crop-preview').hidden = true; $('crop-controls').hidden = true;
   for (const type of ['IMAGE_FILE','IMAGE_CAMERA']) { const preview = document.querySelector(`[data-object="${type}"]`).firstChild; preview.replaceChildren(); preview.className = 'custom-icon'; preview.textContent = '＋'; }
@@ -377,9 +398,9 @@ function discardImages() {
   renderObject($('egg'),objectType); $('gift-canvas').getContext('2d').clearRect(0,0,$('gift-canvas').width,$('gift-canvas').height); $('gift-save').disabled = true;
 }
 $('discard-images').addEventListener('click',discardImages);
-function openGift() { show('gift'); const data=giftData(game,images);data.objectStyle=objectStyle; giftEditor.open(data); window.dispatchEvent(new CustomEvent('photo-gift:preview',{detail:data})); }
+function openGift() { if(!photoSettings.value.giftEnabled)return;show('gift');const data=giftData(game,images);data.objectStyle=objectStyle;sharedGift.open({session:sharedCapture.photos,data,hasConsent:sharedPhotoUI.hasConsent(),onBack:()=>show('result'),onNext:nextParticipant}); }
 $('gift-open').addEventListener('click',openGift);
-$('gift-back').addEventListener('click',() => show('result'));
+
 $('play-duration').addEventListener('input',() => { duration=Number($('play-duration').value); updateSetupArt(); });
 for (const phrase of phrases) { const option=document.createElement('option');option.textContent=phrase;$('audio-phrase').append(option); }
 function syncAudio() {

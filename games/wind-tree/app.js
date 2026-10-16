@@ -1,3 +1,9 @@
+import {
+  mountPhotoSettings,
+  photoSettings,
+} from "../../shared/photo-settings.js";
+import { getSharedGift } from "../../shared/photo-gift.js";
+import { registerCleanup, nextParticipant } from "../../shared/participant.js";
 import { PosePipeline } from "./pose-pipeline.mjs";
 import { screenPoint, screenAxis, HandWind, AutumnLeaves } from "./autumn.mjs";
 import {
@@ -6,9 +12,9 @@ import {
   sensitivityGain,
   restoreSensitivities,
 } from "./trial.mjs";
-import { PhotoSession } from "./photos.mjs";
-import { PhotoUI } from "./photo-ui.mjs";
-import { FaceCapture } from "./face-capture.mjs";
+import { PhotoSession } from "../../shared/photos.mjs";
+import { PhotoUI } from "../../shared/photo-ui.mjs";
+import { SharedSmileCapture as FaceCapture } from "../../shared/smile-capture.mjs";
 const $ = (s) => document.querySelector(s),
   canvas = $("#world"),
   ctx = canvas.getContext("2d"),
@@ -97,10 +103,47 @@ let gains = Object.fromEntries(
     sensitivityGain(value),
   ]),
 );
-const faceCapture = new FaceCapture({
+let faceCapture;
+const sharedGift = getSharedGift();
+const sharedPhotoUI = mountPhotoSettings($("#shared-photo-settings"), {
+  onRevoke: (erase = true) => {
+    faceCapture?.stop();
+    if (erase) {
+      photoUI.clear();
+      sharedGift.clear();
+    }
+  },
+  onChange: (value) => {
+    faceCapture?.configure(value);
+    if (!value.enabled) faceCapture?.stop();
+    else if (
+      faceCapture &&
+      running &&
+      !test &&
+      stream &&
+      sharedPhotoUI.hasConsent() &&
+      !faceCapture.enabled &&
+      photos.photos.length < value.maxPhotos
+    ) {
+      const last = faceCapture.gate?.lastCapture;
+      faceCapture.start(value.threshold / 100, {
+        holdMs: value.holdSeconds * 1000,
+        cooldownMs: value.cooldownSeconds * 1000,
+        faceFps: value.faceFps,
+      });
+      if (Number.isFinite(last)) faceCapture.gate.lastCapture = last;
+    }
+    $("#wind-gift-open").hidden = !value.giftEnabled;
+  },
+});
+faceCapture = new FaceCapture({
   video,
   session: photos,
-  onStatus: (message) => ($("#photoStatus").textContent = message),
+  hasConsent: () => sharedPhotoUI.hasConsent() && photoSettings.value.enabled,
+  onStatus: (message) => {
+    $("#photoStatus").textContent = message;
+    sharedPhotoUI.status(message);
+  },
   onPhoto: () => photoUI.render(),
   getElapsed: () => clock.snapshot().elapsedMs,
   isPlaying: () => running && !clock.paused && !document.hidden,
@@ -144,14 +187,6 @@ $("#durationNumber").oninput = () => {
     if (clock.phase === "idle") $("#timer").textContent = value;
   }
 };
-$("#smileThreshold").oninput = () =>
-  ($("#smileThresholdValue").textContent = `${$("#smileThreshold").value}%`);
-$("#photoConsent").onchange = () => {
-  if (!$("#photoConsent").checked) {
-    $("#smileEnabled").checked = false;
-    $("#photoStatus").textContent = "同意がないため撮影OFFです";
-  }
-};
 $("#stopPhotoBtn").onclick = () => {
   faceCapture.stop();
   $("#stopPhotoBtn").classList.add("hidden");
@@ -179,8 +214,10 @@ async function initPose() {
   if (pose) return;
   pose = await PosePipeline.create();
 }
+let cameraGeneration = 0;
 async function cameraStart() {
-  stream = await navigator.mediaDevices.getUserMedia({
+  const generation = ++cameraGeneration;
+  const acquired = await navigator.mediaDevices.getUserMedia({
     video: {
       facingMode: "user",
       width: { ideal: 960 },
@@ -188,9 +225,20 @@ async function cameraStart() {
     },
     audio: false,
   });
+  if (generation !== cameraGeneration) {
+    acquired.getTracks().forEach((t) => t.stop());
+    throw Error("Camera request cancelled");
+  }
+  stream = acquired;
   video.srcObject = stream;
   await video.play();
-  await initPose();
+  const pipeline = pose && !pose.error ? pose : await PosePipeline.create();
+  if (generation !== cameraGeneration) {
+    pipeline.close();
+    acquired.getTracks().forEach((t) => t.stop());
+    throw Error("Pose request cancelled");
+  }
+  pose = pipeline;
 }
 function confidence(p) {
   return p && Number.isFinite(p.x) && Number.isFinite(p.y)
@@ -541,7 +589,9 @@ function render() {
   }
 }
 function stopCamera() {
-  pose?.reset?.();
+  cameraGeneration++;
+  pose?.close();
+  pose = null;
   if (stream) {
     stream.getTracks().forEach((t) => t.stop());
     stream = null;
@@ -731,6 +781,7 @@ function loop(t) {
   gameFrame = requestAnimationFrame(loop);
 }
 function resetTrial() {
+  sharedGift.clear();
   trialGeneration++;
   running = false;
   starting = false;
@@ -753,7 +804,7 @@ function resetTrial() {
   lastVideo = -1;
   lastPoseT = lastT = lastInputT = 0;
   $("#photoConsent").checked = false;
-  $("#smileEnabled").checked = true;
+  $("#smileEnabled").checked = photoSettings.value.enabled;
   $("#finish").classList.add("hidden");
   $("#start").classList.remove("hidden");
   $("#testPanel").classList.add("hidden");
@@ -786,6 +837,7 @@ async function begin(useTest) {
   faceCapture.stop();
   stopCamera();
   photoUI.clear();
+  photos.maxPhotos = photoSettings.value.maxPhotos;
   photos.start(crypto.randomUUID());
   configuredDurationSec = duration;
   test = useTest;
@@ -806,7 +858,7 @@ async function begin(useTest) {
   lastPoseT = lastT = 0;
   const consent = $("#photoConsent").checked,
     enablePhotos = $("#smileEnabled").checked && consent && !test;
-  if (!consent) $("#smileEnabled").checked = false;
+
   $("#start").classList.add("hidden");
   $("#testPanel").classList.toggle("hidden", !test);
   $("#timer").textContent = duration;
@@ -819,12 +871,11 @@ async function begin(useTest) {
     if (!test) await cameraStart();
   } catch {
     stopCamera();
-    starting = false;
-    $("#start").classList.remove("hidden");
+    if (generation !== trialGeneration) return;
+    test = true;
+    $("#testPanel").classList.remove("hidden");
     $("#photoStatus").textContent =
-      "カメラを開始できません。許可を確認するかPCテストモードで遊べます。";
-    $("#startStatus").textContent = $("#photoStatus").textContent;
-    return;
+      "カメラを使えないためPCテストに切り替えました。撮影OFFで遊べます。";
   }
   if (generation !== trialGeneration) {
     stopCamera();
@@ -835,14 +886,47 @@ async function begin(useTest) {
   clock.setPaused(document.hidden, performance.now());
   lastInputT = performance.now();
   $("#message").textContent = "3";
-  if (enablePhotos) {
-    faceCapture.start(+$("#smileThreshold").value / 100);
+  if (enablePhotos && !test) {
+    faceCapture.start(photoSettings.value.threshold / 100, {
+      holdMs: photoSettings.value.holdSeconds * 1000,
+      cooldownMs: photoSettings.value.cooldownSeconds * 1000,
+      faceFps: photoSettings.value.faceFps,
+    });
     $("#stopPhotoBtn").classList.remove("hidden");
   }
 }
 $("#startBtn").onclick = () => begin(false);
 $("#testBtn").onclick = () => begin(true);
 $("#againBtn").onclick = resetTrial;
+$("#wind-gift-open").onclick = () => {
+  faceCapture.stop();
+  stopCamera();
+  $("#app").classList.add("hidden");
+  sharedGift.open({
+    session: photos,
+    gameName: "風に立つ",
+    result: resultInfo,
+    hasConsent: sharedPhotoUI.hasConsent(),
+    onBack: () => $("#app").classList.remove("hidden"),
+    onNext: nextParticipant,
+  });
+};
+$("#wind-next-participant").onclick = nextParticipant;
+registerCleanup(() => {
+  trialGeneration++;
+  starting = running = false;
+  faceCapture.stop();
+  stopCamera();
+  photoUI.clear();
+  sharedGift.clear();
+  clock.reset();
+  cancelAnimationFrame(gameFrame);
+  labInstance?.dispose();
+  labInstance = null;
+  labActive = false;
+  labOpening = false;
+});
+
 $("#skeletonToggle").onclick = () => {
   skeleton = !skeleton;
   $("#skeletonToggle").textContent = `SKELETON ${skeleton ? "ON" : "OFF"}`;
@@ -898,7 +982,7 @@ $("#windLabBtn").onclick = async () => {
   if (labActive || labOpening || starting || running) return;
   labOpening = true;
   try {
-    const { WindLab } = await import("./wind-lab.js");
+    const { WindLab } = await import("./wind-lab.js?v=phase6-shared-photos");
     resetTrial();
     labActive = true;
     cancelAnimationFrame(gameFrame);

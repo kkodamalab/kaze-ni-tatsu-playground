@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node --test tests/unit.test.mjs tests/seesaw.unit.test.mjs",
+    "test": "node --test tests/unit.test.mjs tests/seesaw.unit.test.mjs tests/shared-photo.unit.test.mjs",
     "test:browser": "npm run build && node --test tests/browser.test.mjs"
   },
   "devDependencies": {
