@@ -17,6 +17,7 @@ export const photoDefaults = Object.freeze({
   eventLocation: "南大沢・大平公園",
 });
 const limits = {
+  scheduledCount: [1, 10],
   threshold: [10, 100],
   holdSeconds: [0.2, 3],
   cooldownSeconds: [1, 15],
@@ -31,6 +32,7 @@ export function cleanPhotoSettings(value = {}) {
     if (Number.isFinite(value?.[key]))
       result[key] = Math.max(min, Math.min(max, value[key]));
   result.maxPhotos = Math.round(result.maxPhotos);
+  result.scheduledCount = Math.round(result.scheduledCount);
   for (const key of ["eventName", "eventLocation"])
     if (typeof value?.[key] === "string") result[key] = value[key].slice(0, 80);
   if (
@@ -92,7 +94,7 @@ export function mountPhotoSettings(
     consent: overrideIds.consent || prefix + "photoConsent",
   };
   root.innerHTML = `<fieldset class="shared-photo-settings"><legend>笑顔シャッター・PHOTO GIFT</legend>
-  ${scheduled ? '<label><input data-setting="scheduledEnabled" type="checkbox">定時自動撮影 ON / OFF</label><p>定時撮影：4枚（プレイ時間の¼・½・¾・終了時）</p>' : ""}
+  ${scheduled ? '<label><input data-setting="scheduledEnabled" type="checkbox">定時自動撮影 ON / OFF</label><label>定時撮影枚数<input data-setting="scheduledCount" type="number" min="1" max="10" step="1"></label><p>撮影時刻はプレイ時間×k/枚数。枚数の変更は次のプレイから適用します。</p>' : ""}
   <label><input id="${ids.enabled}" data-setting="enabled" type="checkbox">笑顔シャッター ON / OFF</label>
   <label>笑顔閾値 <output id="${prefix}smileThresholdValue">60%</output><input id="${ids.threshold}" data-setting="threshold" type="range" min="10" max="100" step="1"></label>
   <label>${scheduled ? "笑顔追加撮影上限" : "撮影枚数（上限）"}<input data-setting="maxPhotos" type="number" min="1" max="10" step="1"></label>

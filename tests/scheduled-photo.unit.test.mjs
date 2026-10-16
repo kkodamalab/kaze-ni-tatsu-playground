@@ -229,3 +229,22 @@ test("board range clamps persisted values to 25..100 percent, keeps default and 
   assert.equal(sanitizeTuning({ boardLength: 0.1 }).boardLength, 0.25);
   assert.equal(sanitizeTuning().boardLength, 1);
 });
+
+test('all scheduled counts 1..10 use duration*k/count and reserve capacity independently of five smile extras', async () => {
+  for (const duration of [20,30,60]) for (let count=1;count<=10;count++) {
+    const {schedule,session}=fixture({duration,count});
+    for(let i=0;i<6;i++)session.add(new Blob(['smile']),{reason:'smile'},session.trialId);
+    for(const time of captureTimes(duration,count))schedule.advance(time);
+    await schedule.finish(duration);
+    assert.equal(session.count('scheduled'),count);assert.equal(session.count(),5);
+    assert.deepEqual(session.photos.filter(p=>p.reason==='scheduled').map(p=>p.scheduledSec),Array.from({length:count},(_,i)=>duration*(i+1)/count));
+  }
+});
+
+test('scheduled count defaults to four, persists, and sanitizes invalid saved values to integers 1..10',async()=>{
+  const {PhotoSettingsStore,cleanPhotoSettings}=await import('../shared/photo-settings.js');
+  const data=new Map(),storage={getItem:k=>data.get(k),setItem:(k,v)=>data.set(k,v)};
+  const store=new PhotoSettingsStore(storage);assert.equal(store.value.scheduledCount,4);
+  for(let count=1;count<=10;count++){store.update({scheduledCount:count});assert.equal(new PhotoSettingsStore(storage).value.scheduledCount,count);}
+  for(const [input,expected] of [[0,1],[11,10],[3.6,4],[NaN,4],['3',4],[null,4]])assert.equal(cleanPhotoSettings({scheduledCount:input}).scheduledCount,expected);
+});

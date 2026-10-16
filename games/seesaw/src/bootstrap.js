@@ -1,7 +1,7 @@
 const params = new URLSearchParams(location.search);
 if (params.has('gift')) {
   document.getElementById('host-app').hidden=true; document.getElementById('gift-receiver').hidden=false;
-  const {startGiftReceiver}=await import('./gift-transfer.js?v=seesaw-timed-capture'); startGiftReceiver(params.get('gift'),params.get('token'));
+  const {startGiftReceiver}=await import('./gift-transfer.js?v=seesaw-counted-capture'); startGiftReceiver(params.get('gift'),params.get('token'));
 } else if (params.has('player') || params.has('room')) {
   document.body.classList.add('controller-view');
   document.getElementById('host-app').hidden = true;
@@ -12,4 +12,4 @@ if (params.has('gift')) {
     const { startController } = await import('./controller.js?v=20261009-ui-physics');
     startController(params.get('room'), { test: params.get('controllerTest') === '1' });
   }
-} else await import('./app.js?v=seesaw-timed-capture');
+} else await import('./app.js?v=seesaw-counted-capture');

@@ -14,7 +14,7 @@ import { WindDebug } from "./src/wind-engine/WindDebug.js";
 import { drawPoseOverlay } from "./src/wind-lab/PoseOverlay.js";
 import { SceneModes } from "./src/wind-lab/SceneModes.js";
 import { SkeletonAvatar } from "./src/wind-lab/SkeletonAvatar.js";
-import { LabPlay } from "./src/wind-lab/LabPlay.js?v=seesaw-timed-capture";
+import { LabPlay } from "./src/wind-lab/LabPlay.js?v=seesaw-counted-capture";
 import {
   trackingSnapshot,
   trackingText,

@@ -266,7 +266,7 @@ test("wind-tree PC DEMO and original PHOTO GIFT selection/download/erase", async
       "browser-test",
     );
     window.photoFixture = { session, ui: new PhotoUI(session) };
-    const {getSharedGift}=await import('../../shared/photo-gift.js?v=seesaw-timed-capture');
+    const {getSharedGift}=await import('../../shared/photo-gift.js?v=seesaw-counted-capture');
     document.querySelector('#app').classList.add('hidden');
     await getSharedGift().open({session,result:{growth:.5},hasConsent:true,onBack(){},onNext(){}});
   });
@@ -1047,4 +1047,19 @@ test('Face initialization failure does not block four scheduled photos',async t=
   await page.route('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@**',r=>r.fulfill({contentType:'text/javascript',headers:{'access-control-allow-origin':'*'},body:"export const FilesetResolver={forVisionTasks:async()=>({})};export const FaceLandmarker={createFromOptions:async()=>{throw Error('synthetic model failure')}};"}));
   await launch(page,'seesaw');await page.locator('#mode').selectOption('test');await page.locator('#center').click();await page.locator('#play-duration').fill('5');await page.locator('#shared-photo-panel > summary').click();await page.locator('#photoConsent').check();await page.locator('#start').click();
   await page.locator('#result').waitFor({state:'visible',timeout:15000});assert.equal(await page.evaluate(()=>sharedAudit.photos.count('scheduled')),4);assert.equal(await page.evaluate(()=>sharedAudit.photos.count()),0);assert.ok(await page.evaluate(()=>captureTracks.every(t=>t.readyState==='ended')&&workerRecords.every(w=>w.closed)));assert.deepEqual(errors,[]);
+});
+
+test('scheduled count UI selects and persists 1..10; ten evenly spaced photos and one final photo reach PHOTO GIFT',async t=>{
+  const {page,errors}=await pageFor(t);await auditCapture(page,{scheduled:true});await launch(page,'seesaw');
+  await page.locator('#shared-photo-panel > summary').click();
+  const count=page.locator('[data-setting=scheduledCount]');assert.equal(await count.inputValue(),'4');
+  for(let n=1;n<=10;n++){await count.fill(String(n));assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('playground:photo-settings')).scheduledCount),n);}
+  await page.reload();await page.waitForFunction(()=>document.body.dataset.appReady==='true');await page.locator('#shared-photo-panel > summary').click();assert.equal(await count.inputValue(),'10');
+  await page.locator('#smileEnabled').uncheck();await page.locator('#mode').selectOption('test');await page.locator('#center').click();await page.locator('#play-duration').fill('5');await page.locator('#photoConsent').check();await page.locator('#start').click();
+  await page.locator('#result').waitFor({state:'visible',timeout:15000});
+  assert.deepEqual(await page.evaluate(()=>sharedAudit.photos.photos.map(p=>p.scheduledSec)),[.5,1,1.5,2,2.5,3,3.5,4,4.5,5]);
+  assert.ok(await page.evaluate(()=>captureTracks.every(t=>t.readyState==='ended')));await page.locator('#gift-open').click();assert.equal(await page.locator('#gift-photo-list button').count(),10);
+  await page.locator('#gift-back').click();await page.locator('#again').click();await count.fill('1');await page.locator('#center').click();await page.locator('#photoConsent').check();await page.locator('#start').click();
+  await page.waitForFunction(()=>document.body.dataset.phase==='play');await page.waitForTimeout(2000);assert.equal(await page.evaluate(()=>sharedAudit.photos.photos.length),0);
+  await page.locator('#result').waitFor({state:'visible',timeout:10000});assert.deepEqual(await page.evaluate(()=>sharedAudit.photos.photos.map(p=>p.scheduledSec)),[5]);assert.deepEqual(errors,[]);
 });

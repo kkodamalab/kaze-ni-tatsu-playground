@@ -5,7 +5,7 @@ let face,
 self.onmessage = async ({ data }) => {
   if (data.type === "init") {
     try {
-      ({ faceObservation } = await import("./photos.mjs?v=seesaw-timed-capture"));
+      ({ faceObservation } = await import("./photos.mjs?v=seesaw-counted-capture"));
       const { FaceLandmarker, FilesetResolver } = await import(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/+esm"
       );

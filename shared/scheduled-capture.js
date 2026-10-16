@@ -1,4 +1,4 @@
-import { mirroredFrame } from "./photos.mjs?v=seesaw-timed-capture";
+import { mirroredFrame } from "./photos.mjs?v=seesaw-counted-capture";
 
 export function captureTimes(duration, count = 4) {
   if (!Number.isFinite(duration) || duration <= 0) return [];

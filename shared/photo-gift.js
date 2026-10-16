@@ -1,6 +1,6 @@
-import { GiftEditor } from "./gift-editor.js?v=seesaw-timed-capture";
-import { photoSettings } from "./photo-settings.js?v=seesaw-timed-capture";
-import { loadImage } from "../games/seesaw/src/images.js?v=seesaw-timed-capture";
+import { GiftEditor } from "./gift-editor.js?v=seesaw-counted-capture";
+import { photoSettings } from "./photo-settings.js?v=seesaw-counted-capture";
+import { loadImage } from "../games/seesaw/src/images.js?v=seesaw-counted-capture";
 let editor, controller;
 export function getGiftEditor(onErase) {
   if (!editor) editor = new GiftEditor(onErase);

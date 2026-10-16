@@ -1,14 +1,14 @@
 import {
   photoSettings,
   mountPhotoSettings,
-} from "../../../../shared/photo-settings.js?v=seesaw-timed-capture";
-import { getSharedGift } from "../../../../shared/photo-gift.js?v=seesaw-timed-capture";
+} from "../../../../shared/photo-settings.js?v=seesaw-counted-capture";
+import { getSharedGift } from "../../../../shared/photo-gift.js?v=seesaw-counted-capture";
 import { nextParticipant } from "../../../../shared/participant.js";
 import { GrowthSession } from "./GrowthSession.js";
 import { validDuration } from "../../trial.mjs";
-import { PhotoSession } from "../../../../shared/photos.mjs?v=seesaw-timed-capture";
+import { PhotoSession } from "../../../../shared/photos.mjs?v=seesaw-counted-capture";
 import { PhotoUI } from "../../../../shared/photo-ui.mjs";
-import { SharedSmileCapture as FaceCapture } from "../../../../shared/smile-capture.mjs?v=seesaw-timed-capture";
+import { SharedSmileCapture as FaceCapture } from "../../../../shared/smile-capture.mjs?v=seesaw-counted-capture";
 import { trackingSnapshot } from "./TrackingReport.js";
 export class LabPlay {
   constructor(lab, initialDuration = 30) {

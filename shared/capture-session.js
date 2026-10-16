@@ -1,7 +1,7 @@
-import { PhotoSession } from "./photos.mjs?v=seesaw-timed-capture";
-import { SharedSmileCapture } from "./smile-capture.mjs?v=seesaw-timed-capture";
-import { ScheduledCapture } from "./scheduled-capture.js?v=seesaw-timed-capture";
-import { photoSettings } from "./photo-settings.js?v=seesaw-timed-capture";
+import { PhotoSession } from "./photos.mjs?v=seesaw-counted-capture";
+import { SharedSmileCapture } from "./smile-capture.mjs?v=seesaw-counted-capture";
+import { ScheduledCapture } from "./scheduled-capture.js?v=seesaw-counted-capture";
+import { photoSettings } from "./photo-settings.js?v=seesaw-counted-capture";
 
 // Seesaw host capture: one camera, independent scheduled/smile allowances.
 export class SharedCaptureSession {
@@ -17,7 +17,7 @@ export class SharedCaptureSession {
   }
   status(message = "") {
     this.settingsUI.status(
-      `${message} · 定時 ${this.photos.count("scheduled")}/${photoSettings.value.scheduledCount}枚 · 笑顔 ${this.photos.count()}/${this.photos.maxPhotos}枚`,
+      `${message} · 定時 ${this.photos.count("scheduled")}/${this.schedule?.times.length ?? photoSettings.value.scheduledCount}枚 · 笑顔 ${this.photos.count()}/${this.photos.maxPhotos}枚`,
     );
   }
   async begin(video = null, { reset = true, duration = 30 } = {}) {

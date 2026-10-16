@@ -1,11 +1,11 @@
 import { ensureGiftScreen } from "./gift-screen.js";
-import { photoSettings } from "./photo-settings.js?v=seesaw-timed-capture";
-import { downloadBlob } from "../games/seesaw/src/images.js?v=seesaw-timed-capture";
+import { photoSettings } from "./photo-settings.js?v=seesaw-counted-capture";
+import { downloadBlob } from "../games/seesaw/src/images.js?v=seesaw-counted-capture";
 import {
   drawGift,
   giftDefaults,
-} from "./gift-renderer.js?v=seesaw-timed-capture";
-import { loadImage } from "../games/seesaw/src/images.js?v=seesaw-timed-capture";
+} from "./gift-renderer.js?v=seesaw-counted-capture";
+import { loadImage } from "../games/seesaw/src/images.js?v=seesaw-counted-capture";
 import { GiftSender } from "./gift-transfer.js";
 export class GiftEditor {
   constructor(onErase = () => {}) {

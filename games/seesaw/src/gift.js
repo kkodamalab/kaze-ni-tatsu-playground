@@ -1,1 +1,1 @@
-export * from "../../../shared/gift-renderer.js?v=seesaw-timed-capture";
+export * from "../../../shared/gift-renderer.js?v=seesaw-counted-capture";

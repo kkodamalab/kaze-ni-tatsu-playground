@@ -1,4 +1,4 @@
-import { photoSettings } from "./photo-settings.js?v=seesaw-timed-capture";
+import { photoSettings } from "./photo-settings.js?v=seesaw-counted-capture";
 import {
   objects,
   gameModes,
@@ -7,7 +7,7 @@ import {
 import {
   emojiCanvas,
   emojiObjects,
-} from "../games/seesaw/src/art.js?v=seesaw-timed-capture";
+} from "../games/seesaw/src/art.js?v=seesaw-counted-capture";
 export function giftData(game, images = {}) {
   return {
     version: 1,

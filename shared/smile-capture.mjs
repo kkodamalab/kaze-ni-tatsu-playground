@@ -2,7 +2,7 @@ import {
   SmileGate,
   mirroredFrame,
   sharpness,
-} from "./photos.mjs?v=seesaw-timed-capture";
+} from "./photos.mjs?v=seesaw-counted-capture";
 export class SharedSmileCapture {
   constructor({
     video,
@@ -16,7 +16,7 @@ export class SharedSmileCapture {
     getAspect = () => innerWidth / innerHeight,
     workerFactory = () =>
       new Worker(
-        new URL("./face-worker.js?v=seesaw-timed-capture", import.meta.url),
+        new URL("./face-worker.js?v=seesaw-counted-capture", import.meta.url),
       ),
   }) {
     Object.assign(this, {
