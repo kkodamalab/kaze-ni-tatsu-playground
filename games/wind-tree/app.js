@@ -1,8 +1,8 @@
 import {
   mountPhotoSettings,
   photoSettings,
-} from "../../shared/photo-settings.js";
-import { getSharedGift } from "../../shared/photo-gift.js";
+} from "../../shared/photo-settings.js?v=seesaw-counted-capture";
+import { getSharedGift } from "../../shared/photo-gift.js?v=seesaw-counted-capture";
 import { registerCleanup, nextParticipant } from "../../shared/participant.js";
 import { PosePipeline } from "./pose-pipeline.mjs";
 import { screenPoint, screenAxis, HandWind, AutumnLeaves } from "./autumn.mjs";
@@ -12,9 +12,9 @@ import {
   sensitivityGain,
   restoreSensitivities,
 } from "./trial.mjs";
-import { PhotoSession } from "../../shared/photos.mjs";
+import { PhotoSession } from "../../shared/photos.mjs?v=seesaw-counted-capture";
 import { PhotoUI } from "../../shared/photo-ui.mjs";
-import { SharedSmileCapture as FaceCapture } from "../../shared/smile-capture.mjs";
+import { SharedSmileCapture as FaceCapture } from "../../shared/smile-capture.mjs?v=seesaw-counted-capture";
 const $ = (s) => document.querySelector(s),
   canvas = $("#world"),
   ctx = canvas.getContext("2d"),
@@ -982,7 +982,7 @@ $("#windLabBtn").onclick = async () => {
   if (labActive || labOpening || starting || running) return;
   labOpening = true;
   try {
-    const { WindLab } = await import("./wind-lab.js?v=phase6-shared-photos");
+    const { WindLab } = await import("./wind-lab.js?v=seesaw-counted-capture");
     resetTrial();
     labActive = true;
     cancelAnimationFrame(gameFrame);

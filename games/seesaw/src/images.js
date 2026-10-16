@@ -41,7 +41,8 @@ export async function loadImage(file) {
 }
 export function downloadBlob(blob, name) {
   const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; a.click();
-  setTimeout(() => URL.revokeObjectURL(url),1000);
+  const timer = setTimeout(() => URL.revokeObjectURL(url),1000);
+  return () => { clearTimeout(timer); URL.revokeObjectURL(url); };
 }
 export function saveCanvas(canvas,name) {
   return new Promise((resolve,reject) => canvas.toBlob(blob => {

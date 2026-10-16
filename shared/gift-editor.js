@@ -1,15 +1,16 @@
 import { ensureGiftScreen } from "./gift-screen.js";
-import { photoSettings } from "./photo-settings.js";
-import { downloadBlob } from "../games/seesaw/src/images.js?v=20261009-ui-physics";
-import { drawGift, giftDefaults } from "./gift-renderer.js";
+import { photoSettings } from "./photo-settings.js?v=seesaw-counted-capture";
+import { downloadBlob } from "../games/seesaw/src/images.js?v=seesaw-counted-capture";
 import {
-  loadImage,
-  saveCanvas,
-} from "../games/seesaw/src/images.js?v=20261009-ui-physics";
+  drawGift,
+  giftDefaults,
+} from "./gift-renderer.js?v=seesaw-counted-capture";
+import { loadImage } from "../games/seesaw/src/images.js?v=seesaw-counted-capture";
 import { GiftSender } from "./gift-transfer.js";
 export class GiftEditor {
   constructor(onErase = () => {}) {
     ensureGiftScreen();
+    this.downloadReleases = new Set();
     this.strokes = [];
     this.photos = {};
     this.options = { ...giftDefaults };
@@ -149,10 +150,11 @@ export class GiftEditor {
           draw !== this.drawGeneration
         )
           return;
-        downloadBlob(
+        const release = downloadBlob(
           blob,
           `kaze-ni-tatsu-${photoSettings.event().date}.${format === "jpeg" ? "jpg" : "png"}`,
         );
+        this.downloadReleases.add(release);
       } catch (e) {
         $("gift-status").textContent = e.message;
       }
@@ -362,6 +364,8 @@ export class GiftEditor {
     this.render();
   }
   close() {
+    for (const release of this.downloadReleases) release?.();
+    this.downloadReleases.clear();
     this.version++;
     this.drawGeneration++;
     this.closeCamera();

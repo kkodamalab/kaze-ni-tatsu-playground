@@ -1,6 +1,6 @@
-import { GiftEditor } from "./gift-editor.js";
-import { photoSettings } from "./photo-settings.js";
-import { loadImage } from "../games/seesaw/src/images.js?v=20261009-ui-physics";
+import { GiftEditor } from "./gift-editor.js?v=seesaw-counted-capture";
+import { photoSettings } from "./photo-settings.js?v=seesaw-counted-capture";
+import { loadImage } from "../games/seesaw/src/images.js?v=seesaw-counted-capture";
 let editor, controller;
 export function getGiftEditor(onErase) {
   if (!editor) editor = new GiftEditor(onErase);
@@ -95,6 +95,11 @@ export class SharedPhotoGift {
       image.src = photo.url;
       image.alt = "今回の参加者の撮影写真";
       button.append(image);
+      const label = document.createElement("span");
+      label.textContent =
+        (photo.reason === "scheduled" ? "定時撮影" : "笑顔撮影") +
+        ` · ${(photo.elapsedSec || 0).toFixed(1)}秒`;
+      button.append(label);
       button.onclick = () => this.choose(photo, this.generation);
       list.append(button);
     }

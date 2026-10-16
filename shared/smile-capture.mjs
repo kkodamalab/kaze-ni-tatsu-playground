@@ -1,4 +1,8 @@
-import { SmileGate, mirroredFrame, sharpness } from "./photos.mjs";
+import {
+  SmileGate,
+  mirroredFrame,
+  sharpness,
+} from "./photos.mjs?v=seesaw-counted-capture";
 export class SharedSmileCapture {
   constructor({
     video,
@@ -11,7 +15,9 @@ export class SharedSmileCapture {
     isPlaying,
     getAspect = () => innerWidth / innerHeight,
     workerFactory = () =>
-      new Worker(new URL("./face-worker.js", import.meta.url)),
+      new Worker(
+        new URL("./face-worker.js?v=seesaw-counted-capture", import.meta.url),
+      ),
   }) {
     Object.assign(this, {
       video,
@@ -64,7 +70,7 @@ export class SharedSmileCapture {
             return;
           }
           const observation = data.observation;
-          if (performance.now() - data.timestamp > 500) {
+          if (performance.now() - data.timestamp > 1000) {
             this.gate.update(0, data.timestamp, false);
             this.onStatus("笑顔推定が遅れています。撮影を見送ります");
             return;
@@ -76,7 +82,7 @@ export class SharedSmileCapture {
           );
           this.onStatus(
             observation.detected
-              ? `笑顔スコア ${Math.round(this.gate.score * 100)}% · 写真 ${this.session.photos.length}/${this.session.maxPhotos}`
+              ? `笑顔スコア ${Math.round(this.gate.score * 100)}% · 笑顔写真 ${this.session.count()}/${this.session.maxPhotos}`
               : "顔が見つかりません。顔をカメラに向けてね",
           );
           if (shouldCapture) this.capture(observation, generation);
@@ -105,8 +111,7 @@ export class SharedSmileCapture {
       this.gate.cooldownMs = cooldownSeconds * 1000;
     }
     this.session.maxPhotos = maxPhotos;
-    while (this.session.photos.length > maxPhotos)
-      this.session.remove(this.session.photos.at(-1).id);
+
     if (this.ready && this.enabled) {
       clearInterval(this.interval);
       this.interval = setInterval(() => this.frame(), 1000 / faceFps);
@@ -164,7 +169,8 @@ export class SharedSmileCapture {
       !this.hasConsent() ||
       this.pendingCapture ||
       !this.isPlaying() ||
-      !observation.detected
+      !observation.detected ||
+      !this.session.canAdd()
     )
       return;
     this.pendingCapture = true;
@@ -193,12 +199,12 @@ export class SharedSmileCapture {
       if (
         this.session.add(
           blob,
-          { elapsedSec, capturedAt, smileScore, quality },
+          { elapsedSec, capturedAt, smileScore, quality, reason: "smile" },
           trialId,
         )
       )
         this.onPhoto();
-      if (this.session.photos.length >= this.session.maxPhotos) {
+      if (!this.session.canAdd()) {
         this.stop();
         this.onStatus("撮影枚数の上限に達しました。写真は終了後に選べます。");
       }
@@ -218,6 +224,7 @@ export class SharedSmileCapture {
     }
   }
   fail(message) {
+    console.error("Smile capture stopped", message);
     this.stop();
     this.onFailure();
     this.onStatus(message);

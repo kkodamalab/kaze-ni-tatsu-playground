@@ -8,8 +8,12 @@ export function smileScore(categories = []) {
   return clamp((0.75 * (left + right)) / 2 + 0.25 * Math.max(left, right));
 }
 export class SmileGate {
-  constructor(threshold = 0.6, { holdMs = 500, cooldownMs = 3000 } = {}) {
+  constructor(
+    threshold = 0.6,
+    { holdMs = 500, cooldownMs = 3000, maxGapMs = 1000 } = {},
+  ) {
     this.holdMs = holdMs;
+    this.maxGapMs = maxGapMs;
     this.cooldownMs = cooldownMs;
     this.threshold = threshold;
     this.reset();
@@ -23,7 +27,7 @@ export class SmileGate {
   }
   update(rawScore, timeMs, detected = true) {
     const dt = this.lastTime === null ? 0 : Math.max(0, timeMs - this.lastTime),
-      gap = dt > 400;
+      gap = dt > this.maxGapMs;
     this.lastTime = timeMs;
     if (!detected) {
       this.score *= Math.exp(-dt / 150);
@@ -67,6 +71,7 @@ export class PhotoSession {
     { maxPhotos = 5, gameName = "kaze-ni-tatsu-body-tree" } = {},
   ) {
     this.maxPhotos = maxPhotos;
+    this.scheduledLimit = 0;
     this.gameName = gameName;
     this.urls = urls;
     this.photos = [];
@@ -78,12 +83,22 @@ export class PhotoSession {
     this.clear();
     this.trialId = trialId;
   }
+  count(reason = "smile") {
+    return this.photos.filter((p) => (p.reason || "smile") === reason).length;
+  }
+  canAdd(reason = "smile") {
+    return (
+      this.count(reason) <
+      (reason === "scheduled" ? this.scheduledLimit : this.maxPhotos)
+    );
+  }
   add(blob, metadata, trialId) {
     if (trialId !== this.trialId || !blob?.size) return null;
     const quality = clamp(metadata.quality);
-    if (this.photos.length >= this.maxPhotos) return null;
+    if (!this.canAdd(metadata.reason || "smile")) return null;
     const photo = {
       ...metadata,
+      reason: metadata.reason || "smile",
       quality,
       blob,
       id: `photo-${++this.serial}`,
@@ -141,7 +156,10 @@ export function faceObservation(result, previous = null, elapsedMs = 125) {
     maxY = Math.max(...ys);
   const center = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
     area = (maxX - minX) * (maxY - minY);
-  const inside = minX >= 0 && maxX <= 1 && minY >= 0 && maxY <= 1;
+  const inside = center.x > 0 && center.x < 1 && center.y > 0 && center.y < 1;
+  const visibleArea =
+    Math.max(0, Math.min(1, maxX) - Math.max(0, minX)) *
+    Math.max(0, Math.min(1, maxY) - Math.max(0, minY));
   const stability = previous
     ? clamp(
         1 -
@@ -150,7 +168,7 @@ export function faceObservation(result, previous = null, elapsedMs = 125) {
       )
     : 1;
   return {
-    detected: inside && area > 0.008,
+    detected: inside && area > 0.008 && visibleArea / area >= 0.65,
     score: smileScore(result.faceBlendshapes?.[0]?.categories),
     quality: clamp(Math.min(1, area / 0.08) * 0.45 + stability * 0.55),
     center,

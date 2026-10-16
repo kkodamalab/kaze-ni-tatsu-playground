@@ -266,7 +266,7 @@ test("wind-tree PC DEMO and original PHOTO GIFT selection/download/erase", async
       "browser-test",
     );
     window.photoFixture = { session, ui: new PhotoUI(session) };
-    const {getSharedGift}=await import('../../shared/photo-gift.js');
+    const {getSharedGift}=await import('../../shared/photo-gift.js?v=seesaw-counted-capture');
     document.querySelector('#app').classList.add('hidden');
     await getSharedGift().open({session,result:{growth:.5},hasConsent:true,onBack(){},onNext(){}});
   });
@@ -721,7 +721,7 @@ test('seesaw staff live clamp/length/response, narrow layout, storage and reset'
   await page.waitForFunction(()=>document.body.dataset.phase==='play');
   await page.locator('#pause').click();
   assert.equal(await page.locator('#tuning-live-game').textContent(),'+10.0°');
-  for(const length of [70,100,130]){
+  for(const length of [25,50,70,100]){
     await page.locator('#tuning-boardLength').fill(String(length));
     const g=await page.evaluate(()=>({scene:document.querySelector('#scene').clientWidth,board:parseFloat(document.querySelector('#platform').style.width)}));
     assert.ok(Math.abs(g.board-g.scene*.7*length/100)<.01);
@@ -736,7 +736,7 @@ test('seesaw staff live clamp/length/response, narrow layout, storage and reset'
   await page.screenshot({path:resolve(site,'../test-results/seesaw-tuning-narrow.png'),fullPage:true});
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await page.reload();await page.waitForFunction(()=>document.body.dataset.appReady==='true');
-  for(const [key,value]of Object.entries({angleGain:'3.1',maxGameAngle:'35',boardLength:'130',objectResponse:'2'}))assert.equal(await page.locator('#tuning-'+key).inputValue(),value);
+  for(const [key,value]of Object.entries({angleGain:'3.1',maxGameAngle:'35',boardLength:'100',objectResponse:'2'}))assert.equal(await page.locator('#tuning-'+key).inputValue(),value);
   await page.locator('#device-tuning summary').click();await page.locator('#tuning-reset').click();
   for(const [key,value]of Object.entries({angleGain:'1',maxGameAngle:'30',boardLength:'100',objectResponse:'1'}))assert.equal(await page.locator('#tuning-'+key).inputValue(),value);
   assert.deepEqual(errors,[]);
@@ -811,7 +811,7 @@ test('LOCAL TILT gain and screen rotation safety; KEEP/STAR and sound controls r
   await page.evaluate(()=>screen.orientation.dispatchEvent(new Event('change')));
   await page.locator('#pause-panel').waitFor({state:'visible'});
   assert.match(await page.locator('#pause-reason').textContent(),/向き/);
-  await page.locator('#quit').click();await page.evaluate(()=>clearInterval(window.sensorFixture));
+  await page.locator('#quit').click();await page.locator('#result').waitFor({state:'visible'});await page.locator('#again').click();await page.evaluate(()=>clearInterval(window.sensorFixture));
   await page.locator('#mode').selectOption('test');await page.locator('#center').click();
   await page.locator('#tuning-reset').click();
   await page.locator('#staff summary').click();
@@ -829,7 +829,8 @@ test('LOCAL TILT gain and screen rotation safety; KEEP/STAR and sound controls r
   assert.deepEqual(errors,[]);
 });
 
-async function auditCapture(page) {
+async function auditCapture(page, {scheduled = false} = {}) {
+  await page.addInitScript(scheduled => { if (!scheduled) localStorage.setItem("playground:photo-settings", JSON.stringify({...JSON.parse(localStorage.getItem("playground:photo-settings") || "{}"),scheduledEnabled:false})); }, scheduled);
   await page.addInitScript(()=>{
     window.cameraCalls=0;window.captureTracks=[];window.workerRecords=[];window.liveObjectURLs=new Set();
     const get=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
@@ -903,14 +904,14 @@ test('seesaw BODY shares one camera between Pose and Face and consent revocation
   assert.equal(await page.evaluate(()=>sharedAudit.photos.photos.length),0);
   assert.ok(await page.evaluate(()=>workerRecords.filter(w=>w.url.includes('face-worker')).every(w=>w.closed)));
   assert.ok(await page.evaluate(()=>captureTracks.some(t=>t.readyState==='live')),'BODY Pose keeps its shared camera while playing without photos');
-  await page.locator('#pause').click();await page.locator('#quit').click();await page.locator('#mode').selectOption('test');
+  await page.locator('#pause').click();await page.locator('#quit').click();await page.locator('#result').waitFor({state:'visible'});await page.locator('#again').click();await page.locator('#mode').selectOption('test');
   assert.ok(await page.evaluate(()=>captureTracks.every(t=>t.readyState==='ended')));
   assert.deepEqual(errors,[]);
 });
 
 test('no consent never starts Face/camera; camera denial falls back without blocking either game',async t=>{
   for(const game of ['seesaw','wind-tree']){
-    const {page,errors}=await pageFor(t);await auditCapture(page);
+    const {page,errors}=await pageFor(t);await auditCapture(page,{scheduled:true});
     await page.addInitScript(()=>{navigator.mediaDevices.getUserMedia=async()=>{window.cameraCalls++;throw new DOMException('Denied','NotAllowedError');};});
     await launch(page,game);
     if(game==='seesaw'){await page.locator('#mode').selectOption('test');await page.locator('#center').click();await page.locator('#play-duration').fill('5');}
@@ -977,4 +978,88 @@ test('Face model failure releases host camera/worker and the game still finishes
   await launch(page,'seesaw');await page.locator('#mode').selectOption('test');await page.locator('#center').click();await page.locator('#play-duration').fill('5');await page.locator('#shared-photo-panel > summary').click();await page.locator('#photoConsent').check();await page.locator('#start').click();
   await page.waitForFunction(()=>cameraCalls===1&&workerRecords.some(w=>w.url.includes('face-worker'))&&workerRecords.every(w=>w.closed)&&captureTracks.every(t=>t.readyState==='ended'));
   await page.locator('#result').waitFor({state:'visible',timeout:15000});assert.equal(await page.evaluate(()=>sharedAudit.photos.photos.length),0);assert.equal(await page.locator('#gift-open').isVisible(),true);assert.deepEqual(errors,[]);
+});
+
+test('seesaw emoji-only objects ignore legacy style and keep custom image import, plus 25% physical fall',async t=>{
+  const {page,errors}=await pageFor(t);
+  await page.addInitScript(()=>localStorage.setItem('keep-the-egg:object-style','svg'));
+  await launch(page,'seesaw');
+  assert.equal(await page.locator('#object-style').count(),0);
+  for(const type of ['EGG','SOCCER_BALL','BASKETBALL','APPLE','CHICK','PEAR','CHESTNUT','MAPLE','LEAF','PUMPKIN','MUSHROOM']){
+    const choice=page.locator(`[data-object="${type}"]`);await choice.click();
+    assert.equal(await choice.locator('svg').count(),0);assert.equal(await choice.locator('[role=img]').count(),1);
+  }
+  assert.equal(await page.locator('[data-object="IMAGE_FILE"]').count(),1);assert.equal(await page.locator('[data-object="IMAGE_CAMERA"]').count(),1);
+  await page.locator('#shared-photo-panel > summary').click();await page.locator('#photoConsent').check();
+  await page.locator('[data-object="IMAGE_FILE"]').click();
+  const png=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=c.height=30;c.getContext('2d').fillRect(0,0,30,30);return c.toDataURL().split(',')[1];});
+  await page.locator('#image-file').setInputFiles({name:'custom.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});
+  await page.locator('#crop-controls').waitFor({state:'visible'});await page.locator('#use-image').click();
+  await page.waitForFunction(()=>document.querySelector('[data-object="IMAGE_FILE"] img'));
+  await page.locator('[data-object="EGG"]').click();await page.locator('#mode').selectOption('test');await page.locator('#center').click();
+  await page.locator('#device-tuning summary').click();
+  assert.equal(await page.locator('#tuning-boardLength').getAttribute('min'),'25');assert.equal(await page.locator('#tuning-boardLength').getAttribute('max'),'100');
+  await page.locator('#tuning-boardLength').fill('25');await page.locator('#tuning-angleGain').fill('3');await page.locator('#tilt').fill('5');
+  await page.locator('[data-game-mode="SURVIVAL"]').click();await page.locator('#start').click();await page.waitForFunction(()=>document.body.dataset.phase==='play');
+  const geometry=await page.evaluate(()=>({scene:document.querySelector('#scene').clientWidth,board:parseFloat(document.querySelector('#platform').style.width)}));
+  await page.locator('#result').waitFor({state:'visible',timeout:15000});
+  const data=await page.evaluate(()=>({trial:JSON.parse(localStorage.getItem('keep-the-egg:last-trial')),scene:document.querySelector('#scene').clientWidth,board:parseFloat(document.querySelector('#platform').style.width)}));
+  assert.equal(data.trial.summary.dropCount,1);assert.equal(data.trial.summary.boardLength,.25);assert.ok(data.trial.summary.survivalTime<3);assert.ok(Math.abs(geometry.board-geometry.scene*.7*.25)<.01);assert.equal(data.trial.metadata.objectStyle,'emoji');assert.deepEqual(errors,[]);
+});
+
+test('scheduled-only 30s capture pauses with the game, saves all four including final, and cleans up through PHOTO GIFT',async t=>{
+  const {page,errors}=await pageFor(t);await auditCapture(page,{scheduled:true});await launch(page,'seesaw');
+  await page.locator('#mode').selectOption('test');await page.locator('#center').click();await page.locator('#play-duration').fill('30');
+  await page.locator('#shared-photo-panel > summary').click();assert.equal(await page.locator('[data-setting=scheduledEnabled]').isChecked(),true);
+  await page.locator('#smileEnabled').uncheck();await page.locator('#photoConsent').check();await page.locator('#start').click();
+  await page.waitForFunction(()=>document.body.dataset.phase==='play');assert.equal(await page.evaluate(()=>sharedAudit.photos.photos.length),0);
+  await page.locator('#pause').click();await page.waitForTimeout(1800);assert.equal(await page.evaluate(()=>sharedAudit.photos.photos.length),0);await page.locator('#resume').click();
+  await page.locator('#result').waitFor({state:'visible',timeout:40000});
+  const result=await page.evaluate(()=>({photos:sharedAudit.photos.photos.map(p=>({reason:p.reason,planned:p.scheduledSec,actual:p.elapsedSec})),calls:cameraCalls,workers:workerRecords,ended:captureTracks.every(t=>t.readyState==='ended')}));
+  assert.equal(result.photos.length,4);assert.deepEqual(result.photos.map(p=>p.planned),[7.5,15,22.5,30]);assert.ok(result.photos.every(p=>p.reason==='scheduled'&&Math.abs(p.actual-p.planned)<.1));assert.equal(result.calls,1);assert.equal(result.workers.length,0);assert.equal(result.ended,true);
+  await page.locator('#gift-open').click();assert.equal(await page.locator('#gift-photo-list button').count(),4);assert.match(await page.locator('#gift-photo-list').textContent(),/定時撮影/);await page.locator('#gift-photo-list button').last().click();
+  for(const format of ['png','jpeg']){await page.locator('#gift-format').selectOption(format);await page.waitForFunction(()=>!document.querySelector('#gift-save').disabled);const d=page.waitForEvent('download');await page.locator('#gift-save').click();const bytes=await readFile(await (await d).path());assert.ok(bytes.length>1000);}
+  await page.screenshot({path:resolve(site,'../test-results/seesaw-scheduled-gift.png'),fullPage:true});
+  let cleared;page.on('console',m=>{if(m.text().startsWith('SCHEDULE_CLEANUP '))cleared=JSON.parse(m.text().slice(17));});
+  await page.evaluate(()=>addEventListener('pagehide',()=>console.log('SCHEDULE_CLEANUP '+JSON.stringify({photos:sharedAudit.photos.photos.length,urls:liveObjectURLs.size}))));
+  page.once('dialog',d=>d.accept());await page.locator('#new-participant').click();await page.waitForURL(base+'index.html');assert.deepEqual(cleared,{photos:0,urls:0});assert.deepEqual(errors,[]);
+});
+
+test('20s scheduled four plus five smile extras coexist and use one host camera despite smile cap',async t=>{
+  const {page,errors}=await pageFor(t);await auditCapture(page,{scheduled:true});await launch(page,'seesaw');
+  await page.locator('#mode').selectOption('test');await page.locator('#center').click();await page.locator('#play-duration').fill('20');await page.locator('#shared-photo-panel > summary').click();
+  await page.locator('#shared-photo-settings details > summary').click();await page.locator('[data-setting=cooldownSeconds]').fill('1');await page.locator('#photoConsent').check();await page.locator('#start').click();
+  await page.locator('#result').waitFor({state:'visible',timeout:30000});
+  const result=await page.evaluate(()=>({smiles:sharedAudit.photos.count(),scheduled:sharedAudit.photos.count('scheduled'),times:sharedAudit.photos.photos.filter(p=>p.reason==='scheduled').map(p=>p.scheduledSec),total:sharedAudit.photos.photos.length,calls:cameraCalls,ended:captureTracks.every(t=>t.readyState==='ended'),closed:workerRecords.every(w=>w.closed)}));
+  assert.equal(result.smiles,5);assert.equal(result.scheduled,4);assert.equal(result.total,9);assert.deepEqual(result.times,[5,10,15,20]);assert.equal(result.calls,1);assert.ok(result.ended&&result.closed);
+  await page.locator('#gift-open').click();assert.equal(await page.locator('#gift-photo-list button').count(),9);assert.match(await page.locator('#gift-photo-list').textContent(),/笑顔撮影/);assert.deepEqual(errors,[]);
+});
+
+test('early quit preserves due photos, cancels future slots and releases camera before result',async t=>{
+  const {page,errors}=await pageFor(t);await auditCapture(page,{scheduled:true});await launch(page,'seesaw');
+  await page.locator('#mode').selectOption('test');await page.locator('#center').click();await page.locator('#play-duration').fill('20');await page.locator('#shared-photo-panel > summary').click();await page.locator('#smileEnabled').uncheck();await page.locator('#photoConsent').check();await page.locator('#start').click();
+  await page.waitForFunction(()=>sharedAudit.photos.count('scheduled')===1,{},{timeout:15000});await page.locator('#pause').click();await page.locator('#quit').click();await page.locator('#result').waitFor({state:'visible'});
+  assert.equal(await page.evaluate(()=>sharedAudit.photos.photos.length),1);assert.ok(await page.evaluate(()=>captureTracks.every(t=>t.readyState==='ended')));await page.waitForTimeout(1500);assert.equal(await page.evaluate(()=>sharedAudit.photos.photos.length),1);await page.locator('#gift-open').click();assert.equal(await page.locator('#gift-photo-list button').count(),1);assert.deepEqual(errors,[]);
+});
+
+test('Face initialization failure does not block four scheduled photos',async t=>{
+  const {page,errors}=await pageFor(t);await auditCapture(page,{scheduled:true});
+  await page.route('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@**',r=>r.fulfill({contentType:'text/javascript',headers:{'access-control-allow-origin':'*'},body:"export const FilesetResolver={forVisionTasks:async()=>({})};export const FaceLandmarker={createFromOptions:async()=>{throw Error('synthetic model failure')}};"}));
+  await launch(page,'seesaw');await page.locator('#mode').selectOption('test');await page.locator('#center').click();await page.locator('#play-duration').fill('5');await page.locator('#shared-photo-panel > summary').click();await page.locator('#photoConsent').check();await page.locator('#start').click();
+  await page.locator('#result').waitFor({state:'visible',timeout:15000});assert.equal(await page.evaluate(()=>sharedAudit.photos.count('scheduled')),4);assert.equal(await page.evaluate(()=>sharedAudit.photos.count()),0);assert.ok(await page.evaluate(()=>captureTracks.every(t=>t.readyState==='ended')&&workerRecords.every(w=>w.closed)));assert.deepEqual(errors,[]);
+});
+
+test('scheduled count UI selects and persists 1..10; ten evenly spaced photos and one final photo reach PHOTO GIFT',async t=>{
+  const {page,errors}=await pageFor(t);await auditCapture(page,{scheduled:true});await launch(page,'seesaw');
+  await page.locator('#shared-photo-panel > summary').click();
+  const count=page.locator('[data-setting=scheduledCount]');assert.equal(await count.inputValue(),'4');
+  for(let n=1;n<=10;n++){await count.fill(String(n));assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('playground:photo-settings')).scheduledCount),n);}
+  await page.reload();await page.waitForFunction(()=>document.body.dataset.appReady==='true');await page.locator('#shared-photo-panel > summary').click();assert.equal(await count.inputValue(),'10');
+  await page.locator('#smileEnabled').uncheck();await page.locator('#mode').selectOption('test');await page.locator('#center').click();await page.locator('#play-duration').fill('5');await page.locator('#photoConsent').check();await page.locator('#start').click();
+  await page.locator('#result').waitFor({state:'visible',timeout:15000});
+  assert.deepEqual(await page.evaluate(()=>sharedAudit.photos.photos.map(p=>p.scheduledSec)),[.5,1,1.5,2,2.5,3,3.5,4,4.5,5]);
+  assert.ok(await page.evaluate(()=>captureTracks.every(t=>t.readyState==='ended')));await page.locator('#gift-open').click();assert.equal(await page.locator('#gift-photo-list button').count(),10);
+  await page.locator('#gift-back').click();await page.locator('#again').click();await count.fill('1');await page.locator('#center').click();await page.locator('#photoConsent').check();await page.locator('#start').click();
+  await page.waitForFunction(()=>document.body.dataset.phase==='play');await page.waitForTimeout(2000);assert.equal(await page.evaluate(()=>sharedAudit.photos.photos.length),0);
+  await page.locator('#result').waitFor({state:'visible',timeout:10000});assert.deepEqual(await page.evaluate(()=>sharedAudit.photos.photos.map(p=>p.scheduledSec)),[5]);assert.deepEqual(errors,[]);
 });

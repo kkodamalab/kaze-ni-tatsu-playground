@@ -2,7 +2,7 @@
 export const tuningKey = 'keep-the-egg:device-tuning';
 export const tuningRanges = Object.freeze({
   angleGain: [0.5, 5, 0.1], maxGameAngle: [10, 35, 1],
-  boardLength: [0.7, 1.3, 0.01], objectResponse: [0.5, 2, 0.1],
+  boardLength: [0.25, 1, 0.01], objectResponse: [0.5, 2, 0.1],
 });
 export const tuningDefaults = Object.freeze({angleGain: 1, maxGameAngle: 30, boardLength: 1, objectResponse: 1});
 export function sanitizeTuning(value = {}) {

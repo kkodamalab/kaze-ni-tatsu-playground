@@ -1,13 +1,13 @@
-import { photoSettings } from "./photo-settings.js";
+import { photoSettings } from "./photo-settings.js?v=seesaw-counted-capture";
 import {
   objects,
   gameModes,
   isImageObject,
 } from "../games/seesaw/src/config.js?v=20261009-ui-physics";
 import {
-  objectSVG,
   emojiCanvas,
-} from "../games/seesaw/src/art.js?v=20261009-ui-physics";
+  emojiObjects,
+} from "../games/seesaw/src/art.js?v=seesaw-counted-capture";
 export function giftData(game, images = {}) {
   return {
     version: 1,
@@ -170,21 +170,17 @@ export async function drawGift(
       ctx.fillText("からだで風をつくったね！", w / 2, h * 0.5);
     } else {
       const type = isImageObject(data.objectType) ? "EGG" : data.objectType;
-      const img =
-        data.objectStyle === "emoji" ||
-        ["PEAR", "CHESTNUT", "MAPLE", "LEAF", "PUMPKIN", "MUSHROOM"].includes(
-          type,
-        )
-          ? emojiCanvas(type) ||
-            (await decode(
-              "data:image/svg+xml;charset=utf-8," +
-                encodeURIComponent(objectSVG(type)),
-            ))
-          : await decode(
-              "data:image/svg+xml;charset=utf-8," +
-                encodeURIComponent(objectSVG(type)),
-            );
-      ctx.drawImage(img, w / 2 - 140, o.title ? 220 : 80, 280, 294);
+      const img = emojiCanvas(type);
+      if (img) ctx.drawImage(img, w / 2 - 140, o.title ? 220 : 80, 280, 294);
+      else {
+        ctx.font =
+          '200px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+        ctx.fillText(
+          emojiObjects[type] || emojiObjects.EGG,
+          w / 2,
+          o.title ? 460 : 320,
+        );
+      }
       ctx.font = "bold 36px sans-serif";
       ctx.fillText("バランスに チャレンジ！", w / 2, h * 0.5);
     }
