@@ -4,6 +4,8 @@ export function today(date = new Date()) {
 }
 export const photoDefaults = Object.freeze({
   enabled: true,
+  scheduledEnabled: true,
+  scheduledCount: 4,
   giftEnabled: true,
   threshold: 60,
   holdSeconds: 0.5,
@@ -23,7 +25,7 @@ const limits = {
 };
 export function cleanPhotoSettings(value = {}) {
   const result = { ...photoDefaults };
-  for (const key of ["enabled", "giftEnabled"])
+  for (const key of ["enabled", "giftEnabled", "scheduledEnabled"])
     if (typeof value?.[key] === "boolean") result[key] = value[key];
   for (const [key, [min, max]] of Object.entries(limits))
     if (Number.isFinite(value?.[key]))
@@ -78,6 +80,7 @@ export function mountPhotoSettings(
   root,
   {
     prefix = "",
+    scheduled = false,
     ids: overrideIds = {},
     onRevoke = () => {},
     onChange = () => {},
@@ -89,9 +92,10 @@ export function mountPhotoSettings(
     consent: overrideIds.consent || prefix + "photoConsent",
   };
   root.innerHTML = `<fieldset class="shared-photo-settings"><legend>笑顔シャッター・PHOTO GIFT</legend>
+  ${scheduled ? '<label><input data-setting="scheduledEnabled" type="checkbox">定時自動撮影 ON / OFF</label><p>定時撮影：4枚（プレイ時間の¼・½・¾・終了時）</p>' : ""}
   <label><input id="${ids.enabled}" data-setting="enabled" type="checkbox">笑顔シャッター ON / OFF</label>
   <label>笑顔閾値 <output id="${prefix}smileThresholdValue">60%</output><input id="${ids.threshold}" data-setting="threshold" type="range" min="10" max="100" step="1"></label>
-  <label>撮影枚数（上限）<input data-setting="maxPhotos" type="number" min="1" max="10" step="1"></label>
+  <label>${scheduled ? "笑顔追加撮影上限" : "撮影枚数（上限）"}<input data-setting="maxPhotos" type="number" min="1" max="10" step="1"></label>
   <details><summary>撮影・イベントの設定</summary><label>笑顔継続時間（秒）<input data-setting="holdSeconds" type="number" min="0.2" max="3" step="0.1"></label><label>クールダウン（秒）<input data-setting="cooldownSeconds" type="number" min="1" max="15" step="0.5"></label><label>Face推論 fps<input data-setting="faceFps" type="number" min="5" max="10" step="1"></label><label>イベント名<input data-setting="eventName" maxlength="80"></label><label>開催日<input data-setting="eventDate" type="date"></label><label>場所<input data-setting="eventLocation" maxlength="80"></label></details>
   <label><input data-setting="giftEnabled" type="checkbox">PHOTO GIFT ON / OFF</label>
   <label class="photo-consent"><input id="${ids.consent}" type="checkbox">写真撮影について、本人・保護者の同意を確認しました</label>
@@ -109,7 +113,10 @@ export function mountPhotoSettings(
     }
     root.querySelector("output").textContent =
       photoSettings.value.threshold + "%";
-    if (!photoSettings.value.enabled)
+    if (
+      !photoSettings.value.enabled &&
+      (!scheduled || !photoSettings.value.scheduledEnabled)
+    )
       root.querySelector(".shared-capture-status").textContent = "撮影OFFです";
     onChange(photoSettings.value);
   };

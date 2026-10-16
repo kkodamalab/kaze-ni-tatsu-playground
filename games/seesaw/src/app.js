@@ -1,21 +1,21 @@
-import { sceneGeometry, rollingAngle } from './geometry.js?v=20261016-device-tuning';
+import { sceneGeometry, rollingAngle } from './geometry.js?v=seesaw-timed-capture';
 import { config, objects, gameModes, isImageObject } from './config.js?v=20261009-ui-physics';
 import { VBFInput, TiltInput, clamp } from './input.js?v=20261009-ui-physics';
-import { SeesawGame, toCSV } from './game.js?v=20261016-device-tuning';
-import { BodyInput, BodyCamera } from './body.js?v=phase6-shared-photos';
-import { renderObject } from './art.js?v=20261009-ui-physics';
-import { loadImage, drawCrop, saveCanvas } from './images.js?v=20261009-ui-physics';
+import { SeesawGame, toCSV } from './game.js?v=seesaw-timed-capture';
+import { BodyInput, BodyCamera } from './body.js?v=seesaw-timed-capture';
+import { renderObject } from './art.js?v=seesaw-timed-capture';
+import { loadImage, drawCrop, saveCanvas } from './images.js?v=seesaw-timed-capture';
 import { giftData, drawGift, resultText } from './gift.js?v=20261009-ui-physics';
 import { PhoneHost } from './phone-host.js?v=20261009-ui-physics';
 import { inputFresh, pauseReason } from './safety.js?v=20261009-ui-physics';
 import { GameAudio, phrases } from './audio.js?v=20261009-ui-physics';
-import { getGiftEditor, getSharedGift } from '../../../shared/photo-gift.js';
-import { SharedCaptureSession } from '../../../shared/capture-session.js';
-import { mountPhotoSettings, photoSettings } from '../../../shared/photo-settings.js';
+import { getGiftEditor, getSharedGift } from '../../../shared/photo-gift.js?v=seesaw-timed-capture';
+import { SharedCaptureSession } from '../../../shared/capture-session.js?v=seesaw-timed-capture';
+import { mountPhotoSettings, photoSettings } from '../../../shared/photo-settings.js?v=seesaw-timed-capture';
 import { registerCleanup, nextParticipant as goNextParticipant } from '../../../shared/participant.js';
 import { StartCountdown } from './countdown.js?v=20261009-ui-physics';
 import { LeafEffects, leafPile } from './leaves.js?v=20261009-ui-physics';
-import { DeviceTuning, tuneSample } from './device-tuning.js';
+import { DeviceTuning, tuneSample } from './device-tuning.js?v=seesaw-timed-capture';
 const $ = id => document.getElementById(id);
 let tuningStorage;
 try { tuningStorage = localStorage; } catch { /* Private browsing can disable storage. */ }
@@ -26,7 +26,7 @@ const sharedGift = getSharedGift();
 const countdown=new StartCountdown();
 const leaves=new LeafEffects($('leaf-background'),$('leaf-flights'));
 let countdownLabel='', startBannerUntil=0;
-let objectStyle = 'svg';
+const objectStyle = 'emoji'; // Ignore legacy illustration preferences.
 let duration = 30;
 let difficulty = 'easy', mode = 'phone', phase = 'setup', game = null, paused = false;
 let needsCenter = false, accumulator = 0, previous = 0, wakeLock = null, requestingLock = false;
@@ -80,8 +80,9 @@ $('tuning-reset').onclick = () => { deviceTuning.reset(); changeTuning(deviceTun
 syncTuning();
 let sharedCapture;
 const sharedPhotoUI=mountPhotoSettings($('shared-photo-settings'),{
+  scheduled:true,
   onRevoke:(erase=true)=>{sharedCapture?.stop();if(erase){discardImages();sharedGift.clear();stopPhoto();}},
-  onChange:value=>{sharedCapture?.face?.configure(value);if(!value.enabled)sharedCapture?.stop();else if(sharedCapture && phase==='play' && sharedPhotoUI.hasConsent() && !sharedCapture.starting && !sharedCapture.face?.enabled && sharedCapture.photos.photos.length<value.maxPhotos)sharedCapture.begin(mode==='body'?$('body-video'):null,{reset:false});$('gift-open').hidden=!value.giftEnabled;}
+  onChange:value=>{sharedCapture?.configure();if(sharedCapture && phase==='play' && sharedPhotoUI.hasConsent() && (value.enabled||value.scheduledEnabled) && !sharedCapture.active && !sharedCapture.starting)sharedCapture.begin(mode==='body'?$('body-video'):null,{reset:false});$('gift-open').hidden=!value.giftEnabled;}
 });
 sharedCapture=new SharedCaptureSession({settingsUI:sharedPhotoUI,isPlaying:()=>phase==='play'&&!paused&&!document.hidden,getElapsed:()=>1000*(game?.elapsed||0)});
 registerCleanup(()=>{discardImages();sharedCapture.clear();sharedGift.clear();countdown.cancel();audio.stop();leaves.reset();bodyCamera.disconnect();tiltInput.disconnect();phoneHost.stop();stopPhoto();clearInterval(feedbackTimer);releaseWakeLock();images={};cropSource=null;phase='setup';paused=false;accumulator=0;game=null;});
@@ -175,6 +176,7 @@ document.querySelectorAll('[data-level]').forEach(button => button.addEventListe
   document.querySelectorAll('[data-level]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
 }));
 function cancelCountdown(reason) {
+  sharedCapture.stop();
   countdown.cancel(); audio.stop(); leaves.reset(); game=null; paused=false; accumulator=0; releaseWakeLock(); show('setup');
   $('start').disabled=true; $('status').textContent=`${reason} 準備ができたら「あそぶ！」で3からやり直してね。`;
 }
@@ -188,7 +190,7 @@ $('start').addEventListener('click', () => {
   if (!fresh() || !input().calibrated) { $('status').textContent = '入力を確認して、まんなかを設定してね。'; return; }
   if (isImageObject(objectType) && !images[objectType]) { $('status').textContent = '写真や作品をえらんでね。'; return; }
   const audioReady=audio.unlock(); audio.reset(); stopPhoto(); game = new SeesawGame(difficulty, { gameMode, objectType, inputMode: mode, duration, tuning: deviceTuning.values });
-  sharedCapture.begin(mode === 'body' ? $('body-video') : null);
+  sharedCapture.begin(mode === 'body' ? $('body-video') : null, {duration:game.duration});
   renderObject($('egg'),objectType,images[objectType],objectStyle); paused = false; needsCenter = false;
   trialMetadata = { preparedAt: new Date().toISOString(), startedAt: null, inputMode: mode, baselineAngle: input().baselineAngle,
     roomId: mode === 'phone' ? phoneHost.room : null, controllerInputType: mode === 'phone' ? input().inputType : null, controllerCalibrationKey: mode === 'phone' ? phoneHost.calibrationKey() : null, gameMode, objectType, objectStyle, configuredDuration: duration, sensitivity: bodyInput.sensitivity, inputInverted: mode === 'body' && bodyInput.invert, filterAlpha: config.alpha, sampleInterval: config.sampleInterval, difficulty, settings: { ...game.settings }, initialDeviceTuning: {...deviceTuning.values} };
@@ -201,7 +203,7 @@ $('reset-center').addEventListener('click', () => {
   if (fresh()) (trialMetadata.recalibrations ??= []).push({ timestamp: game.elapsed, baselineAngle: input().rawAngle });
   resume(true);
 });
-$('quit').addEventListener('click', prepare);
+$('quit').addEventListener('click', () => { if (game && phase === 'play') { paused=false; finish(); } else prepare(); });
 $('again').addEventListener('click', prepare);
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause('画面をはなれたので、おやすみしています。'); });
 window.addEventListener('pagehide', () => { audio.stop(); phoneHost.stop(); clearInterval(feedbackTimer); releaseWakeLock(); bodyCamera.disconnect(); tiltInput.disconnect(); stopPhoto(); });
@@ -240,8 +242,14 @@ function render() {
   const message = falling ? 'おっと！ もういちど' : !game.isSafe ? 'そーっと、まっすぐ' : game.streak >= 6 ? 'すごい！' : game.streak >= 2 ? 'いいね！' : 'そのまま！';
   if ($('message').textContent !== message) $('message').textContent = message;
 }
-function finish() {
-  sharedCapture.stop();
+let finishing = false;
+async function finish() {
+  if (finishing || !game) return;
+  finishing = true;
+  const completedGame = game;
+  await sharedCapture.finish(game.elapsed);
+  finishing = false;
+  if (game !== completedGame) return;
   releaseWakeLock();
   if (mode === 'body') { bodyCamera.disconnect(); $('connect').disabled = false; }
   show('result'); leaves.reset(); leafPile($('result-leaves'),gameMode==='STAR'?game.stars:0); $('celebration').hidden=gameMode==='STAR';
@@ -284,7 +292,7 @@ function frame(now) {
     else if(state.started) { countdownDisplay('スタート！'); show('play'); $('start-countdown').hidden=false; startBannerUntil=now+650; trialMetadata.startedAt=new Date().toISOString(); accumulator=0; previous=now; acquireWakeLock(); }
     else if(state.active) countdownDisplay(state.label);
     render();
-  } else if (phase === 'play' && !paused) {
+  } else if (phase === 'play' && !paused && !finishing) {
     if(now>=startBannerUntil)$('start-countdown').hidden=true;
     const dt = (now - previous) / 1000;
     const reason = mode === 'phone' && !input().calibrated ? 'スマホで中央姿勢を設定してください。' : pauseReason(input(), mode, now, dt, document.hidden);
@@ -292,6 +300,7 @@ function frame(now) {
     else {
       accumulator += Math.max(0, dt);
       while (accumulator >= config.step && !game.done) { game.step(config.step, tunedInput()); accumulator -= config.step; }
+      sharedCapture.tick(game.elapsed);
       audio.update(game); render();
       if (game.done) finish();
     }
@@ -427,5 +436,3 @@ const feedbackTimer = setInterval(() => { if (mode === 'phone') phoneHost.feedba
 phoneHost.start();
 $('play-duration').disabled = false; $('mode').disabled = false; $('game-mode').disabled = false; $('difficulty').disabled = false;
 document.body.dataset.appReady = 'true';
-
-$('object-style').addEventListener('change',()=>{objectStyle=$('object-style').value;for(const b of document.querySelectorAll('[data-object]'))if(!isImageObject(b.dataset.object))renderObject(b.firstChild,b.dataset.object,null,objectStyle);});

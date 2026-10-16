@@ -46,9 +46,9 @@ test('PC/simulated +/-5 degrees with gain3/4 actually falls off both normalized 
   }
 });
 
-test('70/100/130 percent boards share geometry, contact, physical speed and normalized fall boundary', () => {
+test('25/50/70/100 percent boards share geometry, contact, physical speed and normalized fall boundary', () => {
   const times = [];
-  for (const length of [.7,1,1.3]) {
+  for (const length of [.25,.5,.7,1]) {
     const game = run({length}); times.push(game.elapsed);
     const geo = sceneGeometry(1000,500,1,15,60,0,length);
     const middle = sceneGeometry(1000,500,0,15,60,0,length);
@@ -58,7 +58,7 @@ test('70/100/130 percent boards share geometry, contact, physical speed and norm
     assert.equal(game.drops, 1); assert.ok(game.position > 1);
     console.log('SEESAW BOARD', {length, seconds: +game.elapsed.toFixed(3), pixels: geo.length});
   }
-  assert.ok(times[0] < times[1] && times[1] < times[2]);
+  assert.ok(times.every((time, i) => i === 0 || times[i-1] < time));
   const reference = new SeesawGame(), shorter = new SeesawGame('easy', {tuning:{boardLength:.7}});
   const sample = {rawAngle:15, relativeAngle:15};
   for(let i=0;i<60;i++){reference.step(1/120,sample);shorter.step(1/120,sample);}
@@ -106,7 +106,7 @@ test('storage persists/resets settings and survives malformed, blocked or unavai
   }
   const blocked=new DeviceTuning({getItem(){throw Error('blocked')},setItem(){throw Error('quota')}});
   blocked.configure({angleGain:3});assert.equal(blocked.saved,false);assert.equal(blocked.values.angleGain,3);
-  assert.deepEqual(sanitizeTuning({angleGain:Infinity,boardLength:-1,maxGameAngle:99,objectResponse:NaN}), {...tuningDefaults,boardLength:.7,maxGameAngle:35});
+  assert.deepEqual(sanitizeTuning({angleGain:Infinity,boardLength:-1,maxGameAngle:99,objectResponse:NaN}), {...tuningDefaults,boardLength:.25,maxGameAngle:35});
 });
 
 test('PHONE CONTROLLER packets, calibration, replay protection, freshness and LOCAL TILT/BODY sensitivity regressions', () => {

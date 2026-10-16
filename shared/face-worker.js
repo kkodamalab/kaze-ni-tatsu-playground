@@ -5,7 +5,7 @@ let face,
 self.onmessage = async ({ data }) => {
   if (data.type === "init") {
     try {
-      ({ faceObservation } = await import("./photos.mjs"));
+      ({ faceObservation } = await import("./photos.mjs?v=seesaw-timed-capture"));
       const { FaceLandmarker, FilesetResolver } = await import(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/+esm"
       );
@@ -25,11 +25,12 @@ self.onmessage = async ({ data }) => {
         minTrackingConfidence: 0.5,
       });
       self.postMessage({ type: "ready" });
-    } catch {
+    } catch (error) {
+      console.error("Face Landmarker", error);
       self.postMessage({
         type: "error",
         message:
-          "笑顔モデルを読み込めませんでした。撮影なしでゲームを続けます。",
+          `笑顔モデルを読み込めませんでした（${error?.message || error}）。ゲームは続けられます。`,
       });
     }
   }
@@ -48,10 +49,11 @@ self.onmessage = async ({ data }) => {
         observation,
         timestamp: data.timestamp,
       });
-    } catch {
+    } catch (error) {
+      console.error("Face Landmarker", error);
       self.postMessage({
         type: "error",
-        message: "笑顔推定を停止しました。撮影なしでゲームを続けます。",
+        message: `笑顔推定を停止しました（${error?.message || error}）。ゲームは続けられます。`,
       });
     } finally {
       data.bitmap.close();

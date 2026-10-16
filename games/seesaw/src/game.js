@@ -1,6 +1,6 @@
 import { config, difficulties, gameModes, physicsSettings, playDuration } from './config.js?v=20261009-ui-physics';
 import { clamp } from './input.js?v=20261009-ui-physics';
-import { sanitizeTuning } from './device-tuning.js';
+import { sanitizeTuning } from './device-tuning.js?v=seesaw-timed-capture';
 
 export class SeesawGame {
   constructor(difficulty = 'easy', { gameMode = 'STAR', objectType = 'EGG', inputMode = 'sensor', duration, tuning }  = {}) {

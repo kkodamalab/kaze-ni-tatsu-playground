@@ -1,1 +1,1 @@
-export * from "../../shared/photos.mjs";
+export * from "../../shared/photos.mjs?v=seesaw-timed-capture";
