@@ -1095,6 +1095,7 @@ test('WIND LAB native/CSS fullscreen, Esc/back/rotation and compact bars preserv
     await page.setViewportSize({width,height});await page.locator('#labFullscreen').click();await page.waitForFunction(()=>fullLab().fullscreen.active);await check();
     for(const id of ['labCamera','labPreview','labSkeleton','labFullscreen','labExit']){const b=await page.locator('#'+id).boundingBox();assert.ok(b&&b.x>=0&&b.y>=0&&b.x+b.width<=width+1&&b.y+b.height<=height+1,id);}
     await page.evaluate(()=>window.dispatchEvent(new Event('orientationchange')));await check();
+    const stage=await page.locator('.lab-stage').boundingBox();assert.ok(Math.abs(stage.y+stage.height-height)<2,'stage fills remaining fullscreen height');
     await page.screenshot({path:resolve(site,`../test-results/lab-fullscreen-${width}-${height}.png`)});
     await page.goBack();await page.waitForFunction(()=>!fullLab().fullscreen.active);await check();
   }

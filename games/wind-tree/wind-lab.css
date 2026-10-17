@@ -345,3 +345,4 @@ html.lab-fullscreen-open,html.lab-fullscreen-open body{overflow:hidden!important
 @media(max-width:600px){#windLab.lab-fullscreen .lab-toolbar{width:100%;gap:3px}#windLab.lab-fullscreen .lab-header button{padding:7px 5px;font-size:10px;min-height:32px}#windLab.lab-fullscreen .lab-caption{font-size:9px;max-width:70%}#windLab.lab-fullscreen .lab-preview:not(.preview-off){width:120px;height:90px}}
 #windLab.lab-fullscreen .lab-details{display:none}
 #windLab.lab-fullscreen .lab-toolbar{display:contents}
+#windLab.lab-fullscreen .lab-play{display:none}
