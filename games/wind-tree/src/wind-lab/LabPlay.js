@@ -109,6 +109,7 @@ export class LabPlay {
     this.$("#labStopPhoto").onclick = () => this.stopPhotos();
     this.$("#labPlayCsv").onclick = () => this.downloadCsv();
     this.$("#labGiftOpen").onclick = () => {
+      this.lab.fullscreen?.exit();
       this.face.stop();
       this.lab.camera.stop();
       this.lab.camera.release?.();

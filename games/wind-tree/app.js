@@ -982,7 +982,7 @@ $("#windLabBtn").onclick = async () => {
   if (labActive || labOpening || starting || running) return;
   labOpening = true;
   try {
-    const { WindLab } = await import("./wind-lab.js?v=seesaw-counted-capture");
+    const { WindLab } = await import("./wind-lab.js?v=fullscreen-preview");
     resetTrial();
     labActive = true;
     cancelAnimationFrame(gameFrame);
