@@ -517,7 +517,7 @@ test("CAMERA ON uses real asynchronous PosePipeline with synthetic upper/full Po
   await page.route("**/pose-worker.js", (route) =>
     route.fulfill({
       contentType: "text/javascript",
-      body: `let mode='upper',sequence,begin;onmessage=async({data:d})=>{if(d.type==='init'){({poseSequence:sequence}=await import('./src/wind-lab/PoseSequences.js'));postMessage({type:'ready'});}if(d.type==='test'){mode=d.mode;}if(d.type==='frame'){begin??=d.timestamp;const aspect=d.bitmap.width/d.bitmap.height;const s=sequence('F',(d.timestamp-begin)/1000);s.worldLandmarks=s.landmarks.map(p=>({...p,x:(p.x-.5)*2*aspect,y:(p.y-.62)*2,z:p.z*2*aspect}));if(mode==='upper'){for(let i=23;i<33;i++)s.landmarks[i].visibility=.05;s.worldLandmarks[13].x=NaN;}if(mode==='lost')s.landmarks=null;d.bitmap.close();setTimeout(()=>postMessage({type:'result',timestamp:d.timestamp,generation:d.generation,result:{landmarks:s.landmarks?[s.landmarks]:[],worldLandmarks:s.worldLandmarks?[s.worldLandmarks]:[]}}),25);}}`,
+      body: `let mode='upper',sequence,begin;onmessage=async({data:d})=>{if(d.type==='init'){({poseSequence:sequence}=await import('./src/wind-lab/PoseSequences.js'));postMessage({type:'ready'});}if(d.type==='test'){mode=d.mode;}if(d.type==='frame'){begin??=d.timestamp;const aspect=d.bitmap.width/d.bitmap.height;const s=sequence('F',(d.timestamp-begin)/1000);for(let i=0;i<23;i++)s.landmarks[i].x+=Math.sin((d.timestamp-begin)/500)*.05;s.worldLandmarks=s.landmarks.map(p=>({...p,x:(p.x-.5)*2*aspect,y:(p.y-.62)*2,z:p.z*2*aspect}));if(mode==='upper'){for(let i=23;i<33;i++)s.landmarks[i].visibility=.05;s.worldLandmarks[13].x=NaN;}if(mode==='lost')s.landmarks=null;d.bitmap.close();setTimeout(()=>postMessage({type:'result',timestamp:d.timestamp,generation:d.generation,result:{landmarks:s.landmarks?[s.landmarks]:[],worldLandmarks:s.worldLandmarks?[s.worldLandmarks]:[]}}),25);}}`,
     }),
   );
   await page.route("https://**/*", (r) => r.abort());
@@ -563,6 +563,21 @@ test("CAMERA ON uses real asynchronous PosePipeline with synthetic upper/full Po
   assert.equal(upper.skeleton, 33);
   assert.ok(upper.poseAge < 500);
   console.log("CAMERA UPPER MEASURE", JSON.stringify(upper));
+  await page.evaluate(()=>cameraAudit.pose.worker.postMessage({type:"test",mode:"full"}));
+  await page.waitForFunction(()=>cameraAudit.lab.avatar.trackingMode==="FULL BODY");
+  await page.evaluate(()=>{const l=cameraAudit.lab;l.apply({...l.engine.config,body:true,left:true,right:true,bodyDeadZone:0,ambient:false,weather:false});window.previewWorker=cameraAudit.pose.worker;window.previewStream=cameraAudit.stream;});
+  const measure=()=>page.evaluate(()=>{const l=cameraAudit.lab;return {fps:l.diagnostics.poseFps,frames:l.diagnostics.poseFrames,video:l.video.currentTime,wrist:[...l.engine.left.position],body:Math.hypot(...l.engine.components.body),left:Math.hypot(...l.engine.components.left),right:Math.hypot(...l.engine.components.right),...l.engine.motion};});
+  await page.waitForTimeout(1400);const beforePreview=await measure();
+  await page.locator('#labPreview').click();await page.waitForTimeout(1600);const afterPreview=await measure();
+  console.log('PREVIEW COMPARISON',JSON.stringify({before:beforePreview,after:afterPreview}));
+  assert.ok(afterPreview.fps>5);assert.ok(afterPreview.video>beforePreview.video);assert.notDeepEqual(afterPreview.wrist,beforePreview.wrist);
+  assert.ok(afterPreview.body>0);assert.ok(afterPreview.left>0);assert.ok(afterPreview.right>0);assert.ok(afterPreview.meanSpeed>.005&&afterPreview.displacement1s>.005);
+  assert.ok(await page.evaluate(()=>cameraAudit.pose.worker===previewWorker&&cameraAudit.stream===previewStream&&!cameraAudit.lab.video.paused));
+  assert.equal(await page.locator('#labCameraActive').isVisible(),true);assert.equal(await page.evaluate(()=>cameraAudit.lab.skeletonPoints),0);
+  await page.locator('#labFullscreen').click();await page.waitForFunction(()=>cameraAudit.lab.fullscreen.active);await page.waitForTimeout(500);assert.ok(await page.evaluate(()=>cameraAudit.pose.worker===previewWorker&&cameraAudit.stream===previewStream&&cameraAudit.lab.cameraOn));await page.locator('#labFullscreen').click();await page.waitForFunction(()=>!cameraAudit.lab.fullscreen.active);
+  await page.locator('#labPreview').click();await page.waitForFunction(()=>cameraAudit.lab.skeletonPoints===33);await page.locator('#labSkeleton').click();await page.waitForTimeout(300);
+  assert.equal(await page.evaluate(()=>cameraAudit.lab.skeletonPoints),0);await page.waitForFunction(()=>cameraAudit.lab.diagnostics.poseFps>5);assert.ok((await measure()).fps>5);await page.locator('#labSkeleton').click();
+  await page.evaluate(()=>cameraAudit.pose.worker.postMessage({type:'test',mode:'upper'}));await page.waitForFunction(()=>cameraAudit.lab.avatar.trackingMode==='UPPER BODY');
   for (const size of [20, 100, 183, 300]) {
     await page.locator("#lab-avatarSize").fill(String(size));
     await page.waitForTimeout(400);
@@ -1062,4 +1077,33 @@ test('scheduled count UI selects and persists 1..10; ten evenly spaced photos an
   await page.locator('#gift-back').click();await page.locator('#again').click();await count.fill('1');await page.locator('#center').click();await page.locator('#photoConsent').check();await page.locator('#start').click();
   await page.waitForFunction(()=>document.body.dataset.phase==='play');await page.waitForTimeout(2000);assert.equal(await page.evaluate(()=>sharedAudit.photos.photos.length),0);
   await page.locator('#result').waitFor({state:'visible',timeout:10000});assert.deepEqual(await page.evaluate(()=>sharedAudit.photos.photos.map(p=>p.scheduledSec)),[5]);assert.deepEqual(errors,[]);
+});
+
+test('WIND LAB native/CSS fullscreen, Esc/back/rotation and compact bars preserve state and orbit gestures',async t=>{
+  const {page,errors}=await pageFor(t);
+  await page.route('https://**/*',r=>r.abort());
+  await page.route('**/games/wind-tree/app.js*',async r=>r.fulfill({contentType:'text/javascript',body:await readFile(resolve(site,'games/wind-tree/app.js'),'utf8')+'\nwindow.fullLab=()=>labInstance;'}));
+  await launch(page,'wind-tree');await page.locator('#windLabBtn').click();await page.waitForFunction(()=>!!fullLab());
+  await page.evaluate(()=>{window.savedLab=fullLab();window.savedEngine=savedLab.engine;window.savedControls=savedLab.controls;savedLab.setMode("KIDS");savedLab.$("#labDuration").value="60";savedLab.play.start();window.savedGrowth=savedLab.play.growth;savedLab.play.photos.start('preserved');savedLab.engine.configure({...savedLab.engine.config,bodySensitivity:123});});
+  let previousElapsed=0;
+  const check=async()=>{const elapsed=await page.evaluate(()=>fullLab().play.growth.elapsedMs);assert.ok(elapsed>=previousElapsed);previousElapsed=elapsed;await page.waitForFunction(()=>{const l=fullLab();return Math.abs(l.view.aspect-l.stage.clientWidth/l.stage.clientHeight)<.001&&l.renderer.domElement.width>0;});assert.ok(await page.evaluate(()=>fullLab()===savedLab&&fullLab().engine===savedEngine&&fullLab().controls===savedControls&&fullLab().play.photos.trialId==='preserved'&&fullLab().engine.config.bodySensitivity===123&&fullLab().play.growth===savedGrowth&&savedGrowth.phase==='playing')); };
+  await page.locator('#labFullscreen').click();await page.waitForFunction(()=>fullLab().fullscreen.active);await check();
+  console.log('FULLSCREEN API',await page.evaluate(()=>({supported:!!document.documentElement.requestFullscreen,native:!!document.fullscreenElement})));
+  await page.keyboard.press('Escape');await page.waitForFunction(()=>!fullLab().fullscreen.active);await check();
+  await page.evaluate(()=>{fullLab().root.requestFullscreen=undefined;fullLab().root.webkitRequestFullscreen=undefined;});
+  for(const [width,height] of [[1440,1000],[390,844],[844,390],[412,915]]){
+    await page.setViewportSize({width,height});await page.locator('#labFullscreen').click();await page.waitForFunction(()=>fullLab().fullscreen.active);await check();
+    for(const id of ['labCamera','labPreview','labSkeleton','labFullscreen','labExit']){const b=await page.locator('#'+id).boundingBox();assert.ok(b&&b.x>=0&&b.y>=0&&b.x+b.width<=width+1&&b.y+b.height<=height+1,id);}
+    await page.evaluate(()=>window.dispatchEvent(new Event('orientationchange')));await check();
+    await page.screenshot({path:resolve(site,`../test-results/lab-fullscreen-${width}-${height}.png`)});
+    await page.goBack();await page.waitForFunction(()=>!fullLab().fullscreen.active);await check();
+  }
+  await page.evaluate(()=>{fullLab().root.requestFullscreen=()=>Promise.reject(Error('denied'));});await page.locator('#labFullscreen').click();await page.waitForFunction(()=>fullLab().fullscreen.active);
+  const canvas=page.locator('.lab-stage > canvas'),b=await canvas.boundingBox();const before=await page.evaluate(()=>fullLab().view.position.toArray());
+  await page.mouse.move(b.x+b.width*.4,b.y+b.height*.4);await page.mouse.down();await page.mouse.move(b.x+b.width*.6,b.y+b.height*.5,{steps:8});await page.mouse.up();await page.waitForTimeout(300);assert.notDeepEqual(await page.evaluate(()=>fullLab().view.position.toArray()),before);
+  const cdp=await page.context().newCDPSession(page);const distance=await page.evaluate(()=>fullLab().view.position.distanceTo(fullLab().controls.target));
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:b.x+b.width*.4,y:b.y+b.height*.5,id:0},{x:b.x+b.width*.6,y:b.y+b.height*.5,id:1}]});
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:b.x+b.width*.25,y:b.y+b.height*.5,id:0},{x:b.x+b.width*.75,y:b.y+b.height*.5,id:1}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await page.waitForTimeout(300);
+  assert.ok(Math.abs(await page.evaluate(()=>fullLab().view.position.distanceTo(fullLab().controls.target))-distance)>.1);
+  await page.locator('#labFullscreen').click();await page.waitForFunction(()=>!fullLab().fullscreen.active);await page.locator('#labExit').click();await page.locator('#windLabBtn').waitFor({state:'visible'});assert.deepEqual(errors,[]);
 });
